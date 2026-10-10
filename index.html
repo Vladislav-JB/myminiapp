@@ -97,7 +97,7 @@ const TG = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : 
 const DEMO = /[?&]demo=1/.test(location.search);
 const IN_TG = !!(TG && TG.initData);                       // есть только внутри Telegram
 const POPUP = IN_TG && TG.isVersionAtLeast && TG.isVersionAtLeast('6.2');
-const notify = (m) => { if (POPUP) TG.showAlert(m); else alert(m); };
+const notify = (m) => { if (POPUP) TG.showAlert(m); else toast(m); };
 const ORDER_ST = [['new','Новый'],['sent','Откликнулся'],['work','В работе'],['done','Сдан'],['paid','Оплачен'],['lost','Не вышло']];
 const CONT_ST = [['none','Не писал'],['wrote','Написал'],['yes','Ответил «да»'],['no','Ответил «нет»'],['later','Повторить']];
 const SRC = [['kwork','Kwork'],['yandex','Яндекс'],['youdo','YouDo'],['avito','Авито'],['hh','hh.ru'],['other','Другое']];
@@ -266,11 +266,14 @@ function waLink(c, which) {
 function toast(msg) {
   const el = document.getElementById('saved'); if (!el) return;
   el.textContent = msg; el.classList.add('on');
-  clearTimeout(toast.t); toast.t = setTimeout(() => { el.classList.remove('on'); el.textContent = 'Сохранено'; }, 3200);
+  clearTimeout(toast.t); toast.t = setTimeout(() => { el.classList.remove('on'); el.textContent = 'Сохранено'; }, 3200 + String(msg).length * 45);
 }
+let pendingConfirm = null;
 function confirmAsk(text, cb) {
-  if (POPUP) TG.showConfirm(text, (ok) => ok && cb());
-  else if (confirm(text)) cb();
+  if (POPUP) { TG.showConfirm(text, (ok) => ok && cb()); return; }
+  pendingConfirm = cb;
+  openSheet('<h2>Подтвердите</h2><div style="font-size:15px;margin-bottom:14px">' + esc(text) + '</div>' +
+    '<div class="acts"><button class="btn" data-act="conf-yes">Да</button><button class="btn sec" data-act="conf-no">Отмена</button></div>');
 }
 
 // ───────── картинка для сообщения (хранится только на этом устройстве) ─────────
@@ -767,14 +770,18 @@ document.addEventListener('click', (e) => {
       const url = waLink(c, 1);
       if (!url) { notify('У компании нет номера для WhatsApp'); break; }
       const list = S.lists.find((l) => l.id === c.list) || curList();
-      const go = async () => {
+      const goReal = async () => {
+        let pre = null;
+        if (!IN_TG && /^https?:/.test(url)) { try { pre = window.open('about:blank', '_blank'); } catch (e) { pre = null; } }
         const img = getImg(list.id);
         const copied = img ? await copyImage(img) : null;
         if (c.status === 'none') markWrote(c);
-        save(); render(); openUrl(url);
+        save(); render();
+        if (pre && !pre.closed) { try { pre.location.href = url; } catch (e) { openUrl(url); } } else openUrl(url);
         if (img && !copied) notify('Картинку не удалось скопировать. Текст в чат вставлен, картинку прикрепите вручную.');
         else toast('Чат открыт. Ctrl+V — картинка. Нет текста в поле? Нажмите «Скопировать текст»');
       };
+      const go = () => goReal().catch((e) => toast('Ошибка: ' + (e && e.message || e)));
       const warns = [];
       if (c.status === 'none' && todayCount() >= dayLimit()) warns.push('Сегодня уже написано ' + todayCount() + ' из ' + dayLimit() + '.');
       if (c.status === 'none' && waitLeft() > 0) warns.push('С прошлого сообщения прошло меньше ' + intervalMin() + ' мин (осталось ' + Math.ceil(waitLeft() / 60000) + ').');
@@ -861,6 +868,8 @@ document.addEventListener('click', (e) => {
       break;
     }
     case 'wipe': confirmAsk('Стереть все заказы, компании и тексты?', () => { S = fresh(); save(); render(); }); break;
+    case 'conf-yes': { const cb = pendingConfirm; pendingConfirm = null; closeSheet(); if (cb) cb(); break; }
+    case 'conf-no': pendingConfirm = null; closeSheet(); break;
     case 'sheet-close': closeSheet(); break;
   }
 });
