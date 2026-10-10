@@ -124,6 +124,19 @@ function fresh() {
     inbox: { url: '', seen: [] }, replies: defaultReplies(), dayLimit: 10, intervalMin: 30, lastWriteAt: 0 };
 }
 let INBOX = { items: [], state: 'off', err: '', at: 0 };
+function normalizeState() {
+  if (!S || typeof S !== 'object') S = fresh();
+  if (!Array.isArray(S.orders)) S.orders = [];
+  if (!Array.isArray(S.contacts)) S.contacts = [];
+  if (!Array.isArray(S.lists) || !S.lists.length) { const f = fresh(); S.lists = f.lists; S.cur = f.cur; }
+  if (!S.lists.find((l) => l.id === S.cur)) S.cur = S.lists[0].id;
+  if (!S.inbox || typeof S.inbox !== 'object') S.inbox = { url: '', seen: [] };
+  if (!Array.isArray(S.inbox.seen)) S.inbox.seen = [];
+  if (!Array.isArray(S.replies) || !S.replies.length) S.replies = defaultReplies();
+  if (!(S.dayLimit > 0)) S.dayLimit = 10;
+  if (!(S.intervalMin > 0)) S.intervalMin = 30;
+  if (!(S.lastWriteAt >= 0)) S.lastWriteAt = 0;
+}
 const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4);
 const today = () => new Date().toISOString().slice(0, 10);
 const addDays = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
@@ -343,8 +356,6 @@ function newInbox() {
 }
 function markSeen(keys) {
   S.inbox = S.inbox || { url: '', seen: [] };
-  if (!Array.isArray(S.replies) || !S.replies.length) S.replies = defaultReplies();
-  if (!(S.dayLimit > 0)) S.dayLimit = 10; if (!(S.intervalMin > 0)) S.intervalMin = 30;
   const set = new Set(S.inbox.seen);
   keys.forEach((k) => set.add(k));
   S.inbox.seen = Array.from(set).slice(-600);
@@ -805,7 +816,7 @@ document.addEventListener('click', (e) => {
       let d = null; try { d = JSON.parse(val('tx')); } catch (x) {}
       if (!d || d.v !== 1 || !Array.isArray(d.orders) || !Array.isArray(d.contacts) || !Array.isArray(d.lists) || !d.lists.length) {
         notify('Это не похоже на копию MyMiniApp'); break; }
-      confirmAsk('Заменить текущие данные копией?', () => { S = d; if (!(S.dayLimit > 0)) S.dayLimit = 10; if (!(S.intervalMin > 0)) S.intervalMin = 30; S.inbox = S.inbox || { url: '', seen: [] }; if (!Array.isArray(S.replies) || !S.replies.length) S.replies = defaultReplies(); if (!S.lists.find((l) => l.id === S.cur)) S.cur = S.lists[0].id; save(); closeSheet(); fetchInbox(true); });
+      confirmAsk('Заменить текущие данные копией?', () => { S = d; normalizeState(); if (!Array.isArray(S.replies) || !S.replies.length) S.replies = defaultReplies(); if (!S.lists.find((l) => l.id === S.cur)) S.cur = S.lists[0].id; save(); closeSheet(); fetchInbox(true); });
       break;
     }
     case 'wipe': confirmAsk('Стереть все заказы, компании и тексты?', () => { S = fresh(); save(); render(); }); break;
@@ -853,7 +864,7 @@ function demo() {
   }
   if (DEMO) { demo(); const m = location.search.match(/tab=(\w+)/); if (m) tab = m[1]; }
   else { const d = await loadData(); if (d) { S = d; if (!S.lists.length) S = fresh(); } }
-  S.inbox = S.inbox || { url: '', seen: [] };
+  normalizeState();
   if (DEMO) {
     S.inbox = { url: '0'.repeat(32), seen: [] };
     INBOX = { state: 'ok', err: '', at: Date.now(), items: [
