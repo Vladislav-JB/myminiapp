@@ -82,6 +82,9 @@ button,input,select,textarea{font:inherit;color:inherit}
 // ───────── настройки и состояние ─────────
 const TG = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
 const DEMO = /[?&]demo=1/.test(location.search);
+const IN_TG = !!(TG && TG.initData);                       // есть только внутри Telegram
+const POPUP = IN_TG && TG.isVersionAtLeast && TG.isVersionAtLeast('6.2');
+const notify = (m) => { if (POPUP) TG.showAlert(m); else alert(m); };
 const ORDER_ST = [['new','Новый'],['sent','Откликнулся'],['work','В работе'],['done','Сдан'],['paid','Оплачен'],['lost','Не вышло']];
 const CONT_ST = [['none','Не писал'],['wrote','Написал'],['yes','Ответил «да»'],['no','Ответил «нет»'],['later','Повторить']];
 const SRC = [['kwork','Kwork'],['yandex','Яндекс'],['youdo','YouDo'],['avito','Авито'],['hh','hh.ru'],['other','Другое']];
@@ -167,7 +170,7 @@ function safeUrl(u) {
 }
 function openUrl(u) {
   const s = safeUrl(u); if (!s) return;
-  if (TG && TG.openLink) TG.openLink(s); else window.open(s, '_blank', 'noopener');
+  if (IN_TG && TG.openLink) TG.openLink(s); else window.open(s, '_blank', 'noopener');
 }
 function detectSrc(u) {
   const s = String(u).toLowerCase();
@@ -206,7 +209,7 @@ function waLink(c, which) {
   return 'https://wa.me/' + num + '?text=' + encodeURIComponent(fillText(which === 2 ? list.t2 : list.t1, c, list));
 }
 function confirmAsk(text, cb) {
-  if (TG && TG.showConfirm) TG.showConfirm(text, (ok) => ok && cb());
+  if (POPUP) TG.showConfirm(text, (ok) => ok && cb());
   else if (confirm(text)) cb();
 }
 
@@ -291,7 +294,8 @@ function viewMore() {
   return '<div class="sec-t">Списки рассылки</div>' +
     S.lists.map((l) => '<div class="card"><div class="row"><div><h3>' + esc(l.name) + '</h3><div class="meta">' +
       S.contacts.filter((c) => c.list === l.id).length + ' компаний · ' + esc(l.url || 'без ссылки') + '</div></div>' +
-      '<button class="btn sec" data-act="list-edit" data-id="' + l.id + '">Тексты</button></div></div>').join('') +
+      '<div class="acts" style="margin-top:0"><button class="btn sec" data-act="list-edit" data-id="' + l.id + '">Тексты</button>' +
+      '<button class="btn red" data-act="list-clear" data-id="' + l.id + '">Очистить</button></div></div></div>').join('') +
     '<div class="acts" style="margin:0 0 6px"><button class="btn sec" data-act="list-new">+ Новый список</button>' +
     '<button class="btn" data-act="import">Импорт списка</button></div>' +
     '<div class="sec-t">Данные</div>' +
@@ -303,8 +307,8 @@ function viewMore() {
 }
 
 // ───────── окна ─────────
-function openSheet(html, bind) { sheet = { html, bind }; render(); if (TG && TG.BackButton) { TG.BackButton.show(); } }
-function closeSheet() { sheet = null; render(); if (TG && TG.BackButton) TG.BackButton.hide(); }
+function openSheet(html, bind) { sheet = { html, bind }; render(); if (IN_TG && TG.BackButton) { TG.BackButton.show(); } }
+function closeSheet() { sheet = null; render(); if (IN_TG && TG.BackButton) TG.BackButton.hide(); }
 const opts = (arr, cur) => arr.map((x) => '<option value="' + x[0] + '"' + (x[0] === cur ? ' selected' : '') + '>' + esc(x[1]) + '</option>').join('');
 
 function orderSheet(id) {
@@ -401,7 +405,7 @@ document.addEventListener('click', (e) => {
     case 'cont-save': {
       const rec = { name: val('c-name').trim(), addr: val('c-addr').trim(), phone: val('c-phone').trim(), wa: val('c-wa').trim(),
         rating: val('c-rate').replace(',', '.').trim(), reviews: val('c-rev').trim(), status: val('c-st'), note: val('c-note').trim() };
-      if (!rec.name) { if (TG && TG.showAlert) TG.showAlert('Укажите название'); else alert('Укажите название'); break; }
+      if (!rec.name) { notify('Укажите название'); break; }
       const apply = (c) => { if (rec.status === 'later' && c.status !== 'later') rec.followAt = addDays(30);
         if (rec.status === 'wrote' && !c.wroteAt) rec.wroteAt = today(); Object.assign(c, rec); };
       if (id) apply(S.contacts.find((x) => x.id === id));
@@ -426,26 +430,36 @@ document.addEventListener('click', (e) => {
     case 'list-del': confirmAsk('Удалить список и все его компании?', () => {
       S.contacts = S.contacts.filter((c) => c.list !== id); S.lists = S.lists.filter((l) => l.id !== id);
       if (S.cur === id) S.cur = S.lists[0].id; save(); closeSheet(); }); break;
+    case 'list-clear': {
+      const l = S.lists.find((x) => x.id === id);
+      const n = S.contacts.filter((c) => c.list === id).length;
+      if (!l || !n) break;
+      confirmAsk('Убрать из списка «' + l.name + '» все компании (' + n + ')? Заказы и тексты останутся.', () => {
+        S.contacts = S.contacts.filter((c) => c.list !== id); save(); render(); });
+      break;
+    }
     case 'import': importSheet(); break;
     case 'import-go': {
       const lines = val('imp').split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
-      let added = 0, skipped = 0; const L = curList();
+      let added = 0, skipped = 0, bad = 0; const L = curList();
       for (const ln of lines) {
         const p = ln.split(/\t|;/).map((s) => s.trim());
         if (!p[0] || /^название$/i.test(p[0])) continue;
+        if (p.length < 3) { bad++; continue; }
         const rec = { id: uid(), list: L.id, name: p[0], addr: p[1] || '', phone: p[2] || '', rating: (p[3] || '').replace(',', '.'),
           reviews: p[4] || '', wa: p[5] || '', status: 'none', note: '' };
         const dup = S.contacts.some((c) => c.list === L.id && c.name.toLowerCase() === rec.name.toLowerCase() && normPhone(c.phone) === normPhone(rec.phone));
         if (dup) skipped++; else { S.contacts.push(rec); added++; }
       }
       save(); sheet = null; tab = 'contacts'; render();
-      const msg = 'Добавлено: ' + added + (skipped ? ', пропущено повторов: ' + skipped : '');
-      if (TG && TG.showAlert) TG.showAlert(msg); else alert(msg); break;
+      const msg = 'Добавлено: ' + added + (skipped ? ', повторов пропущено: ' + skipped : '') +
+        (bad ? '. Строк не в формате «название; адрес; телефон» пропущено: ' + bad : '');
+      notify(msg); break;
     }
     case 'export': {
       const json = JSON.stringify(S);
       if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(json).then(
-        () => (TG && TG.showAlert ? TG.showAlert('Копия в буфере обмена. Вставьте её в заметки.') : alert('Копия в буфере обмена')),
+        () => notify('Копия в буфере обмена. Вставьте её в заметки.'),
         () => textSheet('Копия данных', 'Выделите всё и скопируйте.', json, '', ''));
       else textSheet('Копия данных', 'Выделите всё и скопируйте.', json, '', '');
       break;
@@ -454,7 +468,7 @@ document.addEventListener('click', (e) => {
     case 'restore-go': {
       let d = null; try { d = JSON.parse(val('tx')); } catch (x) {}
       if (!d || d.v !== 1 || !Array.isArray(d.orders) || !Array.isArray(d.contacts) || !Array.isArray(d.lists) || !d.lists.length) {
-        if (TG && TG.showAlert) TG.showAlert('Это не похоже на копию MyMiniApp'); else alert('Это не похоже на копию MyMiniApp'); break; }
+        notify('Это не похоже на копию MyMiniApp'); break; }
       confirmAsk('Заменить текущие данные копией?', () => { S = d; if (!S.lists.find((l) => l.id === S.cur)) S.cur = S.lists[0].id; save(); closeSheet(); });
       break;
     }
@@ -499,7 +513,7 @@ function demo() {
 (async function init() {
   if (TG) {
     try { TG.ready(); TG.expand(); } catch (e) {}
-    if (TG.BackButton) TG.BackButton.onClick(() => closeSheet());
+    if (IN_TG && TG.BackButton) TG.BackButton.onClick(() => closeSheet());
   }
   if (DEMO) { demo(); const m = location.search.match(/tab=(\w+)/); if (m) tab = m[1]; }
   else { const d = await loadData(); if (d) { S = d; if (!S.lists.length) S = fresh(); } }
