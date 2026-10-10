@@ -251,6 +251,10 @@ function fillText(t, c, list) {
   return t.replace(/\{название\}/g, c.name || '').replace(/\{адрес\}/g, c.addr || '')
           .replace(/\{оценка\}/g, rate).replace(/\{ссылка\}/g, list.url || '');
 }
+function msgText(c, which) {
+  const list = S.lists.find((l) => l.id === c.list) || curList();
+  return fillText(which === 2 ? list.t2 : list.t1, c, list);
+}
 function waLink(c, which) {
   const list = S.lists.find((l) => l.id === c.list) || curList();
   const num = waNumber(c); if (!num) return '';
@@ -258,6 +262,11 @@ function waLink(c, which) {
   if (S.waMode === 'app') return 'whatsapp://send?phone=' + num + '&text=' + text;
   if (S.waMode === 'web') return 'https://web.whatsapp.com/send?phone=' + num + '&text=' + text;
   return 'https://wa.me/' + num + '?text=' + text;
+}
+function toast(msg) {
+  const el = document.getElementById('saved'); if (!el) return;
+  el.textContent = msg; el.classList.add('on');
+  clearTimeout(toast.t); toast.t = setTimeout(() => { el.classList.remove('on'); el.textContent = 'Сохранено'; }, 3200);
 }
 function confirmAsk(text, cb) {
   if (POPUP) TG.showConfirm(text, (ok) => ok && cb());
@@ -320,6 +329,7 @@ function viewNext() {
     '<h4 style="margin:0;font-size:16px">' + esc(c.name) + '</h4><div class="meta">' + esc(c.addr || '') +
     (c.rating ? ' · ★ ' + esc(String(c.rating).replace('.', ',')) : '') + '</div>' +
     '<div class="acts"><button class="btn" data-act="prep" data-id="' + c.id + '">' + (hasImg ? 'Подготовить' : 'Написать') + '</button>' +
+    '<button class="btn sec" data-act="copytext" data-id="' + c.id + '">Скопировать текст</button>' +
     '<button class="btn sec" data-act="next-skip" data-id="' + c.id + '">Пропустить</button></div>' +
     (hasImg ? '' : '<div class="meta" style="margin-top:6px">Картинка не загружена: «Ещё» → «Тексты» у списка.</div>') + '</div>';
 }
@@ -472,6 +482,7 @@ function viewContacts() {
         ? '<button class="btn" data-act="prep" data-id="' + c.id + '"' + (num ? '' : ' disabled') + '>Подготовить</button>' +
           '<button class="btn sec" data-act="wa1" data-id="' + c.id + '"' + (num ? '' : ' disabled') + '>Только текст</button>'
         : '<button class="btn" data-act="wa1" data-id="' + c.id + '"' + (num ? '' : ' disabled') + '>Написать</button>') +
+      '<button class="btn sec" data-act="copytext" data-id="' + c.id + '">Скопировать текст</button>' +
       '<button class="btn ' + (c.status === 'yes' ? '' : 'sec') + '" data-act="wa2" data-id="' + c.id + '"' + (num ? '' : ' disabled') + '>Отправить ссылку</button>' +
       (c.phone ? '<a class="btn sec" href="tel:' + esc(String(c.phone).replace(/[^\d+]/g, '')) + '">Позвонить</a>' : '') +
       '</div></div>';
@@ -741,6 +752,16 @@ document.addEventListener('click', (e) => {
     case 'inbox-refresh': INBOX.at = 0; fetchInbox(true); break;
     case 'inbox-hide': markSeen([el.dataset.k]); save(); render(); break;
     case 'inbox-hide-all': confirmAsk('Скрыть все новые (' + newInbox().length + ')?', () => { markSeen(newInbox().map((i) => i.key)); save(); render(); }); break;
+    case 'copytext': {
+      const c = S.contacts.find((x) => x.id === id); if (!c) break;
+      const t = msgText(c, c.status === 'yes' ? 2 : 1);
+      (async () => {
+        let ok = false;
+        try { if (navigator.clipboard && navigator.clipboard.writeText) { await navigator.clipboard.writeText(t); ok = true; } } catch (e) {}
+        toast(ok ? 'Текст скопирован. В WhatsApp: щёлкните в подпись и нажмите Ctrl+V' : 'Не удалось скопировать текст автоматически');
+      })();
+      break;
+    }
     case 'prep': {
       const c = S.contacts.find((x) => x.id === id); if (!c) break;
       const url = waLink(c, 1);
@@ -752,6 +773,7 @@ document.addEventListener('click', (e) => {
         if (c.status === 'none') markWrote(c);
         save(); render(); openUrl(url);
         if (img && !copied) notify('Картинку не удалось скопировать. Текст в чат вставлен, картинку прикрепите вручную.');
+        else toast('Чат открыт. Ctrl+V — картинка. Нет текста в поле? Нажмите «Скопировать текст»');
       };
       const warns = [];
       if (c.status === 'none' && todayCount() >= dayLimit()) warns.push('Сегодня уже написано ' + todayCount() + ' из ' + dayLimit() + '.');
