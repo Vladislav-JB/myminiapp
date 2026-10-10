@@ -70,6 +70,13 @@ button,input,select,textarea{font:inherit;color:inherit}
 .g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .note{font-size:13px;color:var(--hint);margin:6px 0 12px}
 .sec-t{font-size:13px;color:var(--hint);text-transform:uppercase;letter-spacing:.04em;margin:16px 4px 6px}
+.inb{background:var(--bg);border:1.5px solid var(--btn);border-radius:14px;padding:12px;margin-bottom:12px}
+.inb .hd{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px}
+.inb .hd b{font-size:15px}
+.inb .it{border-top:1px solid var(--line);padding:10px 0}
+.inb .it h4{margin:0;font-size:15px;word-break:break-word}
+.inb .sm{padding:6px 10px;font-size:13px}
+.tip{font-size:13px;color:var(--hint);background:var(--bg);border-radius:12px;padding:10px 12px;margin-bottom:12px}
 .saved{position:fixed;left:50%;top:10px;transform:translateX(-50%);background:rgba(0,0,0,.75);color:#fff;font-size:13px;padding:6px 12px;border-radius:999px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:20}
 .saved.on{opacity:1}
 </style>
@@ -98,8 +105,10 @@ let sheet = null;         // { html, bind }
 
 function fresh() {
   return { v: 1, orders: [], contacts: [], cur: 'l1',
-    lists: [{ id: 'l1', name: 'Типографии: календари', url: 'https://web-atelie.ru/kalendari/', t1: T1, t2: T2 }] };
+    lists: [{ id: 'l1', name: 'Типографии: календари', url: 'https://web-atelie.ru/kalendari/', t1: T1, t2: T2 }],
+    inbox: { url: '', seen: [] } };
 }
+let INBOX = { items: [], state: 'off', err: '', at: 0 };
 const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4);
 const today = () => new Date().toISOString().slice(0, 10);
 const addDays = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
@@ -213,6 +222,64 @@ function confirmAsk(text, cb) {
   else if (confirm(text)) cb();
 }
 
+// ───────── входящие: заказы от сторожей через секретный gist ─────────
+function gistId(u) { const m = String(u || '').match(/[0-9a-f]{20,40}/i); return m ? m[0] : ''; }
+function cleanItem(i) {
+  if (!i || typeof i.key !== 'string' || !/^(kwork|hh):/.test(i.key)) return null;
+  const str = (v, n) => String(v == null ? '' : v).slice(0, n);
+  return { key: i.key, src: i.src === 'hh' ? 'hh' : 'kwork', title: str(i.title, 200), price: Math.max(0, Math.round(+i.price || 0)),
+    priceMax: Math.max(0, Math.round(+i.priceMax || 0)), url: safeUrl(i.url), note: str(i.note, 300), at: str(i.at, 25) };
+}
+async function fetchInbox(force) {
+  if (DEMO) return;
+  const id = gistId((S.inbox || {}).url);
+  if (!id) { INBOX = { items: [], state: 'off', err: '', at: 0 }; return; }
+  if (!force && Date.now() - INBOX.at < 60000) return;
+  INBOX.at = Date.now();
+  try {
+    const r = await fetch('https://api.github.com/gists/' + id, { headers: { Accept: 'application/vnd.github+json' } });
+    if (!r.ok) throw new Error('GitHub ответил ' + r.status);
+    const g = await r.json();
+    const f = g.files && g.files['inbox.json'];
+    if (!f) throw new Error('в ячейке нет файла inbox.json');
+    let txt = f.content;
+    if (f.truncated && f.raw_url) txt = await (await fetch(f.raw_url)).text();
+    const d = JSON.parse(txt);
+    const items = (Array.isArray(d.items) ? d.items : []).map(cleanItem).filter(Boolean).slice(0, 150);
+    INBOX = { items, state: 'ok', err: '', at: Date.now() };
+  } catch (e) { INBOX = { items: INBOX.items, state: 'err', err: String(e && e.message || e), at: Date.now() }; }
+  render();
+}
+function newInbox() {
+  const seen = new Set((S.inbox || {}).seen || []);
+  return INBOX.items.filter((i) => !seen.has(i.key));
+}
+function markSeen(keys) {
+  S.inbox = S.inbox || { url: '', seen: [] };
+  const set = new Set(S.inbox.seen);
+  keys.forEach((k) => set.add(k));
+  S.inbox.seen = Array.from(set).slice(-600);
+}
+function viewInbox() {
+  const has = gistId((S.inbox || {}).url);
+  if (!has) return '<div class="tip">Заказы от сторожей Kwork и hh.ru можно получать прямо сюда: «Ещё» → «Входящие».</div>';
+  const list = newInbox();
+  let h = '<div class="inb"><div class="hd"><b>Входящие · ' + (INBOX.state === 'ok' || list.length ? list.length + ' нов.' : '…') + '</b><div class="acts" style="margin:0">' +
+    (list.length > 1 ? '<button class="btn sec sm" data-act="inbox-hide-all">Скрыть все</button>' : '') +
+    '<button class="btn sec sm" data-act="inbox-refresh">Обновить</button></div></div>';
+  if (INBOX.state === 'err') h += '<div class="meta" style="color:var(--bad)">Не удалось получить входящие: ' + esc(INBOX.err) + '</div>';
+  else if (!list.length) h += '<div class="meta">' + (INBOX.state === 'ok' ? 'Новых нет. Всё разобрано.' : 'Загружаю…') + '</div>';
+  list.slice(0, 10).forEach((i) => {
+    h += '<div class="it"><h4>' + esc(i.title) + '</h4><div class="meta"><span class="badge">' + esc(i.src === 'hh' ? 'hh.ru' : 'Kwork') + '</span>' +
+      (i.price ? money(i.price) + (i.priceMax > i.price ? ' – ' + money(i.priceMax) : '') : '') + (i.note ? ' · ' + esc(i.note) : '') + '</div>' +
+      '<div class="acts" style="margin-top:8px"><button class="btn sm" data-act="inbox-take" data-k="' + esc(i.key) + '">В заказы</button>' +
+      (i.url ? '<button class="btn sec sm" data-act="open-url" data-url="' + esc(i.url) + '">Открыть</button>' : '') +
+      '<button class="btn sec sm" data-act="inbox-hide" data-k="' + esc(i.key) + '">Скрыть</button></div></div>';
+  });
+  if (list.length > 10) h += '<div class="meta">…и ещё ' + (list.length - 10) + '</div>';
+  return h + '</div>';
+}
+
 // ───────── отрисовка ─────────
 const $app = document.getElementById('app');
 function render() {
@@ -237,7 +304,7 @@ function viewOrders() {
   const paid = all.filter((o) => o.status === 'paid' && (o.paidAt || '').slice(0, 7) === month).reduce((s, o) => s + (+o.price || 0), 0);
   let list = all.filter((o) => (fOrder === 'all' || o.status === fOrder) && (!q || (o.title + ' ' + o.note).toLowerCase().includes(q.toLowerCase())));
   list = list.slice().sort((a, b) => (b.created || '').localeCompare(a.created || ''));
-  let h = '<div class="stats">' +
+  let h = viewInbox() + '<div class="stats">' +
     '<div class="stat"><b>' + inWork + '</b><span>в работе</span></div>' +
     '<div class="stat"><b>' + money(wait) + '</b><span>ждут оплаты</span></div>' +
     '<div class="stat"><b>' + money(paid) + '</b><span>оплачено за месяц</span></div></div>';
@@ -291,7 +358,11 @@ function viewContacts() {
 
 function viewMore() {
   const where = CS ? 'в облаке Telegram (синхронизируется между вашими устройствами)' : 'в памяти этого устройства (вне Telegram)';
-  return '<div class="sec-t">Списки рассылки</div>' +
+  const inbId = gistId((S.inbox || {}).url);
+  return '<div class="sec-t">Входящие (заказы от сторожей)</div>' +
+    '<div class="card"><div class="meta" style="margin:0 0 8px">' + (inbId ? 'Подключено. Новых сейчас: ' + newInbox().length + '.' : 'Не подключено.') + '</div>' +
+    '<div class="acts" style="margin-top:0"><button class="btn sec" data-act="inbox-setup">' + (inbId ? 'Изменить ссылку' : 'Подключить') + '</button></div></div>' +
+    '<div class="sec-t">Списки рассылки</div>' +
     S.lists.map((l) => '<div class="card"><div class="row"><div><h3>' + esc(l.name) + '</h3><div class="meta">' +
       S.contacts.filter((c) => c.list === l.id).length + ' компаний · ' + esc(l.url || 'без ссылки') + '</div></div>' +
       '<div class="acts" style="margin-top:0"><button class="btn sec" data-act="list-edit" data-id="' + l.id + '">Тексты</button>' +
@@ -360,6 +431,14 @@ function listSheet(id) {
     (id && S.lists.length > 1 ? '<button class="btn red" data-act="list-del" data-id="' + id + '">Удалить список</button>' : '') +
     '<button class="btn sec" data-act="sheet-close">Закрыть</button></div>');
 }
+function inboxSheet() {
+  openSheet('<h2>Входящие</h2>' +
+    '<div class="note">Сторожа Kwork и hh.ru кладут новые заказы в личную «ячейку» на GitHub. Вставьте сюда её ссылку или номер (мне его дал Claude, он лежит на компьютере в файле inbox-gist.txt). Приложение само подтянет новые заказы.</div>' +
+    '<label class="f"><span>Ссылка или номер ячейки</span><input id="inb-url" value="' + esc((S.inbox || {}).url || '') + '" placeholder="https://gist.github.com/…/…"></label>' +
+    '<div class="acts"><button class="btn" data-act="inbox-save">Сохранить и проверить</button>' +
+    ((S.inbox || {}).url ? '<button class="btn red" data-act="inbox-off">Отключить</button>' : '') +
+    '<button class="btn sec" data-act="sheet-close">Закрыть</button></div>');
+}
 function importSheet() {
   openSheet('<h2>Импорт списка</h2>' +
     '<div class="note">Вставьте строки из таблицы: <b>название; адрес; телефон; рейтинг; отзывов; WhatsApp</b> (последние три можно пропустить). Разделитель — табуляция или «;». Компании попадут в текущий список: <b>' + esc(curList().name) + '</b>.</div>' +
@@ -382,7 +461,7 @@ document.addEventListener('click', (e) => {
   if (act === 'q' || act === 'list-switch') return;
   e.stopPropagation();
   switch (act) {
-    case 'tab': tab = el.dataset.v; q = ''; render(); break;
+    case 'tab': tab = el.dataset.v; q = ''; render(); if (tab === 'orders') fetchInbox(false); break;
     case 'forder': fOrder = el.dataset.v; render(); break;
     case 'fcont': fCont = el.dataset.v; render(); break;
     case 'order-new': orderSheet(null); break;
@@ -438,6 +517,23 @@ document.addEventListener('click', (e) => {
         S.contacts = S.contacts.filter((c) => c.list !== id); save(); render(); });
       break;
     }
+    case 'inbox-setup': inboxSheet(); break;
+    case 'inbox-save': {
+      const v = val('inb-url').trim();
+      if (!gistId(v)) { notify('Не похоже на ссылку или номер ячейки'); break; }
+      S.inbox = S.inbox || { url: '', seen: [] }; S.inbox.url = v; save();
+      INBOX = { items: [], state: 'loading', err: '', at: 0 }; closeSheet(); fetchInbox(true); break;
+    }
+    case 'inbox-off': confirmAsk('Отключить входящие?', () => { S.inbox = { url: '', seen: [] }; INBOX = { items: [], state: 'off', err: '', at: 0 }; save(); closeSheet(); }); break;
+    case 'inbox-refresh': INBOX.at = 0; fetchInbox(true); break;
+    case 'inbox-hide': markSeen([el.dataset.k]); save(); render(); break;
+    case 'inbox-hide-all': confirmAsk('Скрыть все новые (' + newInbox().length + ')?', () => { markSeen(newInbox().map((i) => i.key)); save(); render(); }); break;
+    case 'inbox-take': {
+      const i = INBOX.items.find((x) => x.key === el.dataset.k); if (!i) break;
+      S.orders.push({ id: uid(), title: i.title, src: i.src, url: i.url, price: i.price || '', deadline: '', status: 'new',
+        note: i.note, created: today(), fromInbox: i.key });
+      markSeen([i.key]); save(); render(); break;
+    }
     case 'import': importSheet(); break;
     case 'import-go': {
       const lines = val('imp').split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
@@ -469,7 +565,7 @@ document.addEventListener('click', (e) => {
       let d = null; try { d = JSON.parse(val('tx')); } catch (x) {}
       if (!d || d.v !== 1 || !Array.isArray(d.orders) || !Array.isArray(d.contacts) || !Array.isArray(d.lists) || !d.lists.length) {
         notify('Это не похоже на копию MyMiniApp'); break; }
-      confirmAsk('Заменить текущие данные копией?', () => { S = d; if (!S.lists.find((l) => l.id === S.cur)) S.cur = S.lists[0].id; save(); closeSheet(); });
+      confirmAsk('Заменить текущие данные копией?', () => { S = d; S.inbox = S.inbox || { url: '', seen: [] }; if (!S.lists.find((l) => l.id === S.cur)) S.cur = S.lists[0].id; save(); closeSheet(); fetchInbox(true); });
       break;
     }
     case 'wipe': confirmAsk('Стереть все заказы, компании и тексты?', () => { S = fresh(); save(); render(); }); break;
@@ -517,7 +613,16 @@ function demo() {
   }
   if (DEMO) { demo(); const m = location.search.match(/tab=(\w+)/); if (m) tab = m[1]; }
   else { const d = await loadData(); if (d) { S = d; if (!S.lists.length) S = fresh(); } }
+  S.inbox = S.inbox || { url: '', seen: [] };
+  if (DEMO) {
+    S.inbox = { url: '0'.repeat(32), seen: [] };
+    INBOX = { state: 'ok', err: '', at: Date.now(), items: [
+      { key: 'kwork:1', src: 'kwork', title: 'Сайт-визитка для частного мастера', price: 8000, priceMax: 15000, url: 'https://kwork.ru/projects/1/view', note: 'откликов: 2', at: '' },
+      { key: 'hh:2', src: 'hh', title: 'AI-ассистент (n8n, Make) — Компания «Пример»', price: 0, priceMax: 0, url: 'https://hh.ru/vacancy/2', note: 'от 90 000 ₽ за месяц', at: '' } ] };
+  }
   render();
+  fetchInbox(true);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) fetchInbox(false); });
 })();
 </script>
 </body>
