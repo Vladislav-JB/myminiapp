@@ -98,6 +98,15 @@ const SRC = [['kwork','Kwork'],['yandex','Яндекс'],['youdo','YouDo'],['avi
 const T1 = 'Здравствуйте!\n\nУвидел вашу компанию «{название}» ({адрес}) на Яндекс.Картах{оценка}.\n\nОбратил внимание, что отдельного сайта пока нет. Перед Новым годом многие заказывают календари, и часть клиентов выбирает тех, у кого сразу видны виды календарей, тиражи и цены.\n\nЯ делаю сайты для типографий. Есть готовый пример страницы квартальных календарей с таблицей цен по тиражам — могу прислать ссылку, если интересно. За 1–2 дня соберу такой же под вас, сначала покажу бесплатно.\n\nВот скриншот примера сайта!';
 const T2 = 'Спасибо! Вот пример: {ссылка}\nТам виды календарей (ламинация, пружина, блоки), таблица цен по тиражам и контакты, с телефона всё удобно. За 1–2 дня соберу такой же под вас: ваше название, цены, адрес. Сначала покажу — понравится, обсудим, нет — ничего не должны.';
 
+const DEF_REPLIES = [
+  ['r1', 'Kwork: готовое демо', 'Здравствуйте! Собрал для вас готовый вариант сайта на основе вашего ТЗ. Структура и подача уже на месте — останется заменить контент на ваш и учесть пожелания. Можно посмотреть здесь: {демо}'],
+  ['r2', 'Сайт-визитка / одностраничник', 'Здравствуйте! Сделаю дизайн и вёрстку сайта-визитки или одностраничника за 1–2 дня. Сначала покажу готовый вариант, платите только если понравится. Тексты под вашу нишу пишу сам, подберу фото, сайт удобно смотреть с телефона. После сдачи 14 дней бесплатных правок. Сейчас для первых клиентов скидка 10% и логотип в подарок. Напишите, чем вы занимаетесь, и я пришлю в чат примеры живых сайтов для похожего бизнеса.'],
+  ['r3', 'Несколько небольших сайтов', 'Здравствуйте! Сделаю оба сайта. Каждый собираю за 1–2 дня: что продаёте, преимущества, цены, фото, отзывы и кнопки связи, удобный вид на телефоне. Сначала показываю готовый сайт, оплата после результата. 14 дней правок бесплатно. Помогу разместить сайт и подключить домен. Расскажите, что за товары и есть ли фото, и я пришлю в чат примеры своих сайтов и точную цену.'],
+  ['r4', 'Логотип', 'Здравствуйте! Предложу 2–3 варианта логотипа для <ниша>: не шаблонный, а свой знак и шрифт, чтобы логотип узнавался на упаковке, в соцсетях и на сайте. Первые варианты пришлю за 1 день, оплата после того, как выберете понравившийся. Правки бесплатно, отдам файлы в PNG и SVG. Напишите название и какое настроение хочется (нежное, дерзкое, премиальное). Если понадобится сайт-витрина, сделаю его тоже.'],
+  ['r5', 'Лендинг с SEO-индексацией', 'Здравствуйте! Сделаю лендинг на <N> страницы за 1–2 дня. Настрою заголовки, описания и разметку, чтобы сайт индексировался в Яндексе и Google, и добавлю его в Вебмастер. Сначала покажу результат, оплата после. 14 дней правок. Напишите тематику, и я пришлю примеры.'],
+  ['r6', 'Листовка / баннер', 'Здравствуйте! Сделаю <листовку/баннер> по вашим образцам: крупное фото, цена, главные плюсы и контакт, читается с двух метров. Первый вариант за день, оплата после результата, правки бесплатно. Отдам файл для печати и картинку для мессенджеров. Пришлите образцы и данные.']
+];
+const defaultReplies = () => DEF_REPLIES.map((r) => ({ id: r[0], name: r[1], text: r[2] }));
 let S = fresh();
 let tab = 'orders';       // orders | contacts | more
 let fOrder = 'all', fCont = 'all', q = '';
@@ -106,7 +115,7 @@ let sheet = null;         // { html, bind }
 function fresh() {
   return { v: 1, orders: [], contacts: [], cur: 'l1',
     lists: [{ id: 'l1', name: 'Типографии: календари', url: 'https://web-atelie.ru/kalendari/', t1: T1, t2: T2 }],
-    inbox: { url: '', seen: [] } };
+    inbox: { url: '', seen: [] }, replies: defaultReplies() };
 }
 let INBOX = { items: [], state: 'off', err: '', at: 0 };
 const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4);
@@ -256,6 +265,7 @@ function newInbox() {
 }
 function markSeen(keys) {
   S.inbox = S.inbox || { url: '', seen: [] };
+  if (!Array.isArray(S.replies) || !S.replies.length) S.replies = defaultReplies();
   const set = new Set(S.inbox.seen);
   keys.forEach((k) => set.add(k));
   S.inbox.seen = Array.from(set).slice(-600);
@@ -272,7 +282,8 @@ function viewInbox() {
   list.slice(0, 10).forEach((i) => {
     h += '<div class="it"><h4>' + esc(i.title) + '</h4><div class="meta"><span class="badge">' + esc(i.src === 'hh' ? 'hh.ru' : 'Kwork') + '</span>' +
       (i.price ? money(i.price) + (i.priceMax > i.price ? ' – ' + money(i.priceMax) : '') : '') + (i.note ? ' · ' + esc(i.note) : '') + '</div>' +
-      '<div class="acts" style="margin-top:8px"><button class="btn sm" data-act="inbox-take" data-k="' + esc(i.key) + '">В заказы</button>' +
+      '<div class="acts" style="margin-top:8px"><button class="btn sm" data-act="inbox-reply" data-k="' + esc(i.key) + '">Отклик</button>' +
+      '<button class="btn sec sm" data-act="inbox-take" data-k="' + esc(i.key) + '">В заказы</button>' +
       (i.url ? '<button class="btn sec sm" data-act="open-url" data-url="' + esc(i.url) + '">Открыть</button>' : '') +
       '<button class="btn sec sm" data-act="inbox-hide" data-k="' + esc(i.key) + '">Скрыть</button></div></div>';
   });
@@ -317,8 +328,11 @@ function viewOrders() {
     '<div class="card" data-act="order-edit" data-id="' + o.id + '"><div class="row"><div><h3>' + esc(o.title || 'Без названия') + '</h3>' +
     '<div class="meta"><span class="badge">' + esc(lbl(SRC, o.src)) + '</span>' + (o.deadline ? 'срок ' + fmtDate(o.deadline) : '') + '</div></div>' +
     '<div class="price">' + (o.price ? money(o.price) : '') + '</div></div>' +
-    '<div style="margin-top:8px"><span class="st ' + o.status + '">' + esc(lbl(ORDER_ST, o.status)) + '</span></div>' +
-    (o.note ? '<div class="meta">' + esc(o.note) + '</div>' : '') + '</div>').join('');
+    '<div style="margin-top:8px"><span class="st ' + o.status + '">' + esc(lbl(ORDER_ST, o.status)) + '</span>' +
+    (o.repliedAt ? ' <span class="meta">откликнулся ' + fmtDate(o.repliedAt) + '</span>' : '') + '</div>' +
+    (o.note ? '<div class="meta">' + esc(o.note) + '</div>' : '') +
+    (o.status === 'new' ? '<div class="acts"><button class="btn sm" data-act="reply-open" data-id="' + o.id + '">Отклик</button></div>' : '') +
+    '</div>').join('');
 }
 
 function viewContacts() {
@@ -362,6 +376,10 @@ function viewMore() {
   return '<div class="sec-t">Входящие (заказы от сторожей)</div>' +
     '<div class="card"><div class="meta" style="margin:0 0 8px">' + (inbId ? 'Подключено. Новых сейчас: ' + newInbox().length + '.' : 'Не подключено.') + '</div>' +
     '<div class="acts" style="margin-top:0"><button class="btn sec" data-act="inbox-setup">' + (inbId ? 'Изменить ссылку' : 'Подключить') + '</button></div></div>' +
+    '<div class="sec-t">Тексты откликов</div>' +
+    S.replies.map((r) => '<div class="card"><div class="row"><div><h3>' + esc(r.name) + '</h3><div class="meta">' + esc(r.text.slice(0, 80)) + '…</div></div>' +
+      '<button class="btn sec" data-act="rtpl-edit" data-id="' + r.id + '">Править</button></div></div>').join('') +
+    '<div class="acts" style="margin:0 0 6px"><button class="btn sec" data-act="rtpl-new">+ Новый шаблон</button></div>' +
     '<div class="sec-t">Списки рассылки</div>' +
     S.lists.map((l) => '<div class="card"><div class="row"><div><h3>' + esc(l.name) + '</h3><div class="meta">' +
       S.contacts.filter((c) => c.list === l.id).length + ' компаний · ' + esc(l.url || 'без ссылки') + '</div></div>' +
@@ -377,6 +395,60 @@ function viewMore() {
     '<div class="note">Токен бота и пароли в приложении не хранятся. Копию данных держите у себя: в ней телефоны компаний.</div>';
 }
 
+// ───────── отклики: готовый текст в буфер + открыть заказ ─────────
+function fillReply(t, o) {
+  return String(t).replace(/\{демо\}/g, o.demo || '{демо}').replace(/\{название\}/g, o.title || '')
+    .replace(/\{сумма\}/g, o.price ? money(o.price) : '').replace(/\{срок\}/g, o.deadline ? fmtDate(o.deadline) : '');
+}
+async function copyText(t) {
+  try { if (navigator.clipboard && navigator.clipboard.writeText) { await navigator.clipboard.writeText(t); return true; } } catch (e) {}
+  try { const ta = document.getElementById('r-text'); if (ta) { ta.focus(); ta.select(); return document.execCommand('copy'); } } catch (e) {}
+  return false;
+}
+function replyWarn(txt) {
+  const w = [];
+  if (/\{демо\}/.test(txt)) w.push('В тексте осталось {демо}: впишите «Ссылку на демо» в заказе или замените вручную.');
+  if (/<[^>]+>/.test(txt)) w.push('В тексте остались <скобки>: замените их вручную перед отправкой.');
+  return w;
+}
+function replySheet(orderId, tplId) {
+  const o = S.orders.find((x) => x.id === orderId); if (!o) return;
+  const tpl = S.replies.find((r) => r.id === tplId) ||
+    (o.src === 'kwork' && o.demo ? S.replies.find((r) => /kwork/i.test(r.name)) : null) || S.replies[0];
+  const txt = fillReply(tpl.text, o);
+  const warn = replyWarn(txt);
+  openSheet('<h2>Отклик</h2><div class="note">' + esc(o.title) + ' · ' + esc(lbl(SRC, o.src)) + '</div>' +
+    '<label class="f"><span>Шаблон</span><select id="r-tpl">' + S.replies.map((r) =>
+      '<option value="' + r.id + '"' + (r.id === tpl.id ? ' selected' : '') + '>' + esc(r.name) + '</option>').join('') + '</select></label>' +
+    '<label class="f"><span>Текст (можно править)</span><textarea id="r-text" style="min-height:230px">' + esc(txt) + '</textarea></label>' +
+    (warn.length ? '<div class="note" style="color:var(--warn)">' + warn.map(esc).join('<br>') + '</div>' : '') +
+    '<div class="note">Приложение ничего не отправляет: оно копирует текст и открывает заказ. Вставьте текст и отправьте отклик сами.</div>' +
+    '<div class="acts"><button class="btn" data-act="reply-go" data-id="' + o.id + '">Скопировать и открыть заказ</button>' +
+    '<button class="btn sec" data-act="reply-copy">Только скопировать</button>' +
+    '<button class="btn sec" data-act="sheet-close">Закрыть</button></div>',
+    (root) => { root.querySelector('#r-tpl').addEventListener('change', (e) => replySheet(orderId, e.target.value)); });
+}
+function takeInbox(key) {
+  const i = INBOX.items.find((x) => x.key === key); if (!i) return null;
+  let o = S.orders.find((x) => x.fromInbox === key);
+  if (!o) {
+    o = { id: uid(), title: i.title, src: i.src, url: i.url, price: i.price || '', deadline: '', status: 'new', note: i.note, created: today(), fromInbox: key };
+    S.orders.push(o);
+  }
+  markSeen([key]); save();
+  return o;
+}
+function replyTplSheet(id) {
+  const r = id ? S.replies.find((x) => x.id === id) : { name: '', text: '' };
+  openSheet('<h2>' + (id ? 'Шаблон отклика' : 'Новый шаблон') + '</h2>' +
+    '<label class="f"><span>Название</span><input id="rt-name" value="' + esc(r.name) + '"></label>' +
+    '<label class="f"><span>Текст</span><textarea id="rt-text" style="min-height:220px">' + esc(r.text) + '</textarea></label>' +
+    '<div class="note">Подстановки: {демо} (из поля «Ссылка на демо» в заказе), {название}, {сумма}, {срок}.</div>' +
+    '<div class="acts"><button class="btn" data-act="rtpl-save" data-id="' + (id || '') + '">Сохранить</button>' +
+    (id ? '<button class="btn red" data-act="rtpl-del" data-id="' + id + '">Удалить</button>' : '') +
+    '<button class="btn sec" data-act="sheet-close">Закрыть</button></div>');
+}
+
 // ───────── окна ─────────
 function openSheet(html, bind) { sheet = { html, bind }; render(); if (IN_TG && TG.BackButton) { TG.BackButton.show(); } }
 function closeSheet() { sheet = null; render(); if (IN_TG && TG.BackButton) TG.BackButton.hide(); }
@@ -387,12 +459,14 @@ function orderSheet(id) {
   openSheet('<h2>' + (id ? 'Заказ' : 'Новый заказ') + '</h2>' +
     '<label class="f"><span>Ссылка на заказ</span><input id="o-url" inputmode="url" value="' + esc(o.url) + '" placeholder="https://kwork.ru/projects/…"></label>' +
     '<label class="f"><span>Название</span><input id="o-title" value="' + esc(o.title) + '"></label>' +
+    '<label class="f"><span>Ссылка на демо (для отклика)</span><input id="o-demo" inputmode="url" value="' + esc(o.demo || '') + '" placeholder="https://web-atelie.ru/…/"></label>' +
     '<div class="g2"><label class="f"><span>Источник</span><select id="o-src">' + opts(SRC, o.src) + '</select></label>' +
     '<label class="f"><span>Сумма, ₽</span><input id="o-price" type="number" inputmode="numeric" value="' + esc(o.price) + '"></label></div>' +
     '<div class="g2"><label class="f"><span>Статус</span><select id="o-st">' + opts(ORDER_ST, o.status) + '</select></label>' +
     '<label class="f"><span>Срок сдачи</span><input id="o-dl" type="date" value="' + esc(o.deadline) + '"></label></div>' +
     '<label class="f"><span>Заметка</span><textarea id="o-note">' + esc(o.note) + '</textarea></label>' +
     '<div class="acts"><button class="btn" data-act="order-save" data-id="' + (id || '') + '">Сохранить</button>' +
+    (id ? '<button class="btn sec" data-act="reply-open" data-id="' + id + '">Отклик</button>' : '') +
     (o.url ? '<button class="btn sec" data-act="open-url" data-url="' + esc(o.url) + '">Открыть заказ</button>' : '') +
     (id ? '<button class="btn red" data-act="order-del" data-id="' + id + '">Удалить</button>' : '') +
     '<button class="btn sec" data-act="sheet-close">Закрыть</button></div>',
@@ -469,7 +543,7 @@ document.addEventListener('click', (e) => {
     case 'order-save': {
       const url = val('o-url').trim(); const src = val('o-src'); const status = val('o-st');
       const rec = { title: val('o-title').trim() || guessTitle(url, src) || 'Без названия', src, url, price: val('o-price'),
-        deadline: val('o-dl'), status, note: val('o-note').trim() };
+        deadline: val('o-dl'), status, note: val('o-note').trim(), demo: val('o-demo').trim() };
       if (id) {
         const o = S.orders.find((x) => x.id === id);
         if (status === 'paid' && o.status !== 'paid') rec.paidAt = today();
@@ -528,6 +602,28 @@ document.addEventListener('click', (e) => {
     case 'inbox-refresh': INBOX.at = 0; fetchInbox(true); break;
     case 'inbox-hide': markSeen([el.dataset.k]); save(); render(); break;
     case 'inbox-hide-all': confirmAsk('Скрыть все новые (' + newInbox().length + ')?', () => { markSeen(newInbox().map((i) => i.key)); save(); render(); }); break;
+    case 'reply-open': replySheet(id); break;
+    case 'inbox-reply': { const o = takeInbox(el.dataset.k); if (o) { render(); replySheet(o.id); } break; }
+    case 'reply-copy': { copyText(val('r-text')).then((ok) => notify(ok ? 'Текст скопирован' : 'Не удалось скопировать: выделите текст и скопируйте вручную')); break; }
+    case 'reply-go': {
+      const o = S.orders.find((x) => x.id === id); if (!o) break;
+      copyText(val('r-text')).then((ok) => {
+        if (!ok) { notify('Не удалось скопировать: выделите текст и скопируйте вручную'); return; }
+        if (o.status === 'new') o.status = 'sent';
+        o.repliedAt = today(); save(); closeSheet();
+        if (o.url) openUrl(o.url);
+        notify('Текст скопирован. Вставьте его на странице заказа и отправьте отклик сами.');
+      });
+      break;
+    }
+    case 'rtpl-new': replyTplSheet(null); break;
+    case 'rtpl-edit': replyTplSheet(id); break;
+    case 'rtpl-save': {
+      const rec = { name: val('rt-name').trim() || 'Шаблон', text: val('rt-text') };
+      if (id) Object.assign(S.replies.find((x) => x.id === id), rec); else S.replies.push(Object.assign({ id: uid() }, rec));
+      save(); closeSheet(); break;
+    }
+    case 'rtpl-del': confirmAsk('Удалить шаблон?', () => { S.replies = S.replies.filter((x) => x.id !== id); if (!S.replies.length) S.replies = defaultReplies(); save(); closeSheet(); }); break;
     case 'inbox-take': {
       const i = INBOX.items.find((x) => x.key === el.dataset.k); if (!i) break;
       S.orders.push({ id: uid(), title: i.title, src: i.src, url: i.url, price: i.price || '', deadline: '', status: 'new',
@@ -565,7 +661,7 @@ document.addEventListener('click', (e) => {
       let d = null; try { d = JSON.parse(val('tx')); } catch (x) {}
       if (!d || d.v !== 1 || !Array.isArray(d.orders) || !Array.isArray(d.contacts) || !Array.isArray(d.lists) || !d.lists.length) {
         notify('Это не похоже на копию MyMiniApp'); break; }
-      confirmAsk('Заменить текущие данные копией?', () => { S = d; S.inbox = S.inbox || { url: '', seen: [] }; if (!S.lists.find((l) => l.id === S.cur)) S.cur = S.lists[0].id; save(); closeSheet(); fetchInbox(true); });
+      confirmAsk('Заменить текущие данные копией?', () => { S = d; S.inbox = S.inbox || { url: '', seen: [] }; if (!Array.isArray(S.replies) || !S.replies.length) S.replies = defaultReplies(); if (!S.lists.find((l) => l.id === S.cur)) S.cur = S.lists[0].id; save(); closeSheet(); fetchInbox(true); });
       break;
     }
     case 'wipe': confirmAsk('Стереть все заказы, компании и тексты?', () => { S = fresh(); save(); render(); }); break;
