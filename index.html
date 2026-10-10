@@ -121,7 +121,7 @@ let sheet = null;         // { html, bind }
 function fresh() {
   return { v: 1, orders: [], contacts: [], cur: 'l1',
     lists: [{ id: 'l1', name: 'Типографии: календари', url: 'https://web-atelie.ru/kalendari/', t1: T1, t2: T2 }],
-    inbox: { url: '', seen: [] }, replies: defaultReplies(), dayLimit: 10, intervalMin: 30, lastWriteAt: 0 };
+    inbox: { url: '', seen: [] }, replies: defaultReplies(), dayLimit: 10, intervalMin: 30, lastWriteAt: 0, waMode: 'wame' };
 }
 let INBOX = { items: [], state: 'off', err: '', at: 0 };
 function normalizeState() {
@@ -136,6 +136,7 @@ function normalizeState() {
   if (!(S.dayLimit > 0)) S.dayLimit = 10;
   if (!(S.intervalMin > 0)) S.intervalMin = 30;
   if (!(S.lastWriteAt >= 0)) S.lastWriteAt = 0;
+  if (!['wame', 'web', 'app'].includes(S.waMode)) S.waMode = 'wame';
 }
 const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4);
 const today = () => new Date().toISOString().slice(0, 10);
@@ -205,7 +206,17 @@ function save() {
 function safeUrl(u) {
   try { const x = new URL(String(u).trim()); return /^https?:$/.test(x.protocol) ? x.href : ''; } catch (e) { return ''; }
 }
+function openApp(u) {
+  // запуск установленной программы WhatsApp через её протокол; браузер или Telegram может спросить подтверждение
+  try {
+    const a = document.createElement('a');
+    a.href = u; a.style.display = 'none'; a.rel = 'noopener';
+    document.body.appendChild(a); a.click();
+    setTimeout(() => a.remove(), 500);
+  } catch (e) {}
+}
 function openUrl(u) {
+  if (/^whatsapp:\/\/send\?/.test(String(u))) { openApp(String(u)); return; }
   const s = safeUrl(u); if (!s) return;
   if (IN_TG && TG.openLink) TG.openLink(s); else window.open(s, '_blank', 'noopener');
 }
@@ -243,7 +254,10 @@ function fillText(t, c, list) {
 function waLink(c, which) {
   const list = S.lists.find((l) => l.id === c.list) || curList();
   const num = waNumber(c); if (!num) return '';
-  return 'https://wa.me/' + num + '?text=' + encodeURIComponent(fillText(which === 2 ? list.t2 : list.t1, c, list));
+  const text = encodeURIComponent(fillText(which === 2 ? list.t2 : list.t1, c, list));
+  if (S.waMode === 'app') return 'whatsapp://send?phone=' + num + '&text=' + text;
+  if (S.waMode === 'web') return 'https://web.whatsapp.com/send?phone=' + num + '&text=' + text;
+  return 'https://wa.me/' + num + '?text=' + text;
 }
 function confirmAsk(text, cb) {
   if (POPUP) TG.showConfirm(text, (ok) => ok && cb());
@@ -473,6 +487,11 @@ function viewMore() {
     '<div class="sec-t">Рассылка</div>' +
     '<div class="card"><div class="row"><div><h3>Лимит в день</h3><div class="meta">Сколько новых первых сообщений в день. Сегодня: ' + todayCount() + ' из ' + dayLimit() + '.</div></div>' +
     '<button class="btn sec" data-act="limit-edit">Изменить</button></div></div>' +
+    '<div class="card"><h3>Как открывать WhatsApp</h3>' +
+    '<label class="f" style="margin-top:8px"><select data-act="wa-mode">' +
+    [['wame', 'Через ссылку wa.me (по умолчанию)'], ['web', 'Через WhatsApp Web'], ['app', 'Через программу WhatsApp']]
+      .map((x) => '<option value="' + x[0] + '"' + (S.waMode === x[0] ? ' selected' : '') + '>' + x[1] + '</option>').join('') +
+    '</select></label><div class="meta">Если чат не открывается или пишет «не удаётся получить доступ к сайту», выберите другой способ. «Через программу» запускает WhatsApp, установленный на компьютере, без браузера (Telegram или система могут спросить разрешение).</div></div>' +
     '<div class="sec-t">Тексты откликов</div>' +
     S.replies.map((r) => '<div class="card"><div class="row"><div><h3>' + esc(r.name) + '</h3><div class="meta">' + esc(r.text.slice(0, 80)) + '…</div></div>' +
       '<button class="btn sec" data-act="rtpl-edit" data-id="' + r.id + '">Править</button></div></div>').join('') +
@@ -646,7 +665,7 @@ document.addEventListener('click', (e) => {
   const el = e.target.closest('[data-act]'); if (!el) return;
   const act = el.dataset.act, id = el.dataset.id;
   if (act === 'sheet-bg') { if (e.target === el) closeSheet(); return; }
-  if (act === 'q' || act === 'list-switch') return;
+  if (act === 'q' || act === 'list-switch' || act === 'wa-mode') return;
   e.stopPropagation();
   switch (act) {
     case 'tab': tab = el.dataset.v; q = ''; render(); if (tab === 'orders') fetchInbox(false); break;
@@ -833,6 +852,7 @@ document.addEventListener('input', (e) => {
 document.addEventListener('change', (e) => {
   const el = e.target;
   if (el.dataset && el.dataset.act === 'list-switch') { S.cur = el.value; fCont = 'all'; save(); render(); }
+  if (el.dataset && el.dataset.act === 'wa-mode') { S.waMode = el.value; save(); render(); }
 });
 
 // ───────── демо-данные для проверки (?demo=1, ничего не сохраняется) ─────────
