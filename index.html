@@ -1,0 +1,510 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>MyMiniApp</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#ffffff">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+:root{
+  --bg:var(--tg-theme-bg-color,#ffffff);
+  --txt:var(--tg-theme-text-color,#1c1c1e);
+  --hint:var(--tg-theme-hint-color,#7b7b85);
+  --link:var(--tg-theme-link-color,#2a6fdb);
+  --btn:var(--tg-theme-button-color,#2a6fdb);
+  --btnt:var(--tg-theme-button-text-color,#ffffff);
+  --sec:var(--tg-theme-secondary-bg-color,#f2f2f7);
+  --line:rgba(128,128,140,.25);
+  --ok:#2e9e5b;--warn:#d98a00;--bad:#d64545;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%}
+body{background:var(--sec);color:var(--txt);font:16px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
+button,input,select,textarea{font:inherit;color:inherit}
+#app{display:flex;flex-direction:column;height:100dvh;max-width:720px;margin:0 auto;background:var(--sec)}
+.top{padding:14px 16px 8px;background:var(--bg);border-bottom:1px solid var(--line)}
+.top h1{margin:0;font-size:20px}
+.top .sub{color:var(--hint);font-size:13px;margin-top:2px}
+.body{flex:1;overflow:auto;padding:12px 12px 90px}
+.tabs{display:flex;background:var(--bg);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
+.tabs button{flex:1;border:0;background:none;padding:10px 4px 9px;font-size:12px;color:var(--hint);display:flex;flex-direction:column;align-items:center;gap:2px}
+.tabs button b{font-size:20px;line-height:1}
+.tabs button.on{color:var(--btn)}
+.chips{display:flex;gap:8px;overflow:auto;padding:2px 0 10px;margin:0 -12px;padding-left:12px;padding-right:12px}
+.chip{flex:none;border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:6px 12px;font-size:14px;white-space:nowrap}
+.chip.on{background:var(--btn);color:var(--btnt);border-color:var(--btn)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.stat{background:var(--bg);border-radius:12px;padding:10px}
+.stat b{display:block;font-size:18px}
+.stat span{font-size:12px;color:var(--hint)}
+.search{width:100%;border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:10px 12px;margin-bottom:10px}
+.card{background:var(--bg);border-radius:14px;padding:12px;margin-bottom:10px}
+.row{display:flex;gap:10px;align-items:flex-start;justify-content:space-between}
+.card h3{margin:0;font-size:16px;word-break:break-word}
+.meta{color:var(--hint);font-size:13px;margin-top:2px;word-break:break-word}
+.price{font-weight:700;white-space:nowrap}
+.badge{display:inline-block;font-size:12px;border-radius:6px;padding:2px 7px;background:var(--sec);color:var(--hint);margin-right:6px}
+.st{display:inline-block;font-size:12px;border-radius:6px;padding:2px 8px;color:#fff;background:var(--hint)}
+.st.work,.st.wrote{background:var(--warn)}
+.st.done,.st.yes{background:var(--ok)}
+.st.paid{background:#1b7a43}
+.st.no,.st.lost{background:var(--bad)}
+.st.later{background:#8a5cd6}
+.acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.btn{border:0;border-radius:10px;padding:9px 13px;background:var(--btn);color:var(--btnt);font-size:14px;font-weight:600;text-decoration:none;display:inline-block}
+.btn.sec{background:var(--sec);color:var(--txt)}
+.btn.red{background:none;color:var(--bad);border:1px solid var(--bad)}
+.btn[disabled]{opacity:.45}
+.fab{position:fixed;right:max(16px,calc(50vw - 344px));bottom:calc(74px + env(safe-area-inset-bottom));width:54px;height:54px;border-radius:50%;border:0;background:var(--btn);color:var(--btnt);font-size:30px;line-height:1;box-shadow:0 4px 14px rgba(0,0,0,.25)}
+.empty{text-align:center;color:var(--hint);padding:36px 16px}
+.empty b{display:block;color:var(--txt);font-size:17px;margin-bottom:6px}
+.sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center;z-index:10}
+.sheet{background:var(--bg);width:100%;max-width:720px;max-height:92dvh;overflow:auto;border-radius:18px 18px 0 0;padding:16px 16px calc(18px + env(safe-area-inset-bottom))}
+.sheet h2{margin:0 0 12px;font-size:18px}
+.f{display:block;margin-bottom:10px}
+.f span{display:block;font-size:12px;color:var(--hint);margin-bottom:3px}
+.f input,.f select,.f textarea{width:100%;border:1px solid var(--line);background:var(--sec);border-radius:10px;padding:10px 12px}
+.f textarea{min-height:90px;resize:vertical}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.note{font-size:13px;color:var(--hint);margin:6px 0 12px}
+.sec-t{font-size:13px;color:var(--hint);text-transform:uppercase;letter-spacing:.04em;margin:16px 4px 6px}
+.saved{position:fixed;left:50%;top:10px;transform:translateX(-50%);background:rgba(0,0,0,.75);color:#fff;font-size:13px;padding:6px 12px;border-radius:999px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:20}
+.saved.on{opacity:1}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div class="saved" id="saved">Сохранено</div>
+<script>
+'use strict';
+// ───────── настройки и состояние ─────────
+const TG = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+const DEMO = /[?&]demo=1/.test(location.search);
+const ORDER_ST = [['new','Новый'],['sent','Откликнулся'],['work','В работе'],['done','Сдан'],['paid','Оплачен'],['lost','Не вышло']];
+const CONT_ST = [['none','Не писал'],['wrote','Написал'],['yes','Ответил «да»'],['no','Ответил «нет»'],['later','Повторить']];
+const SRC = [['kwork','Kwork'],['yandex','Яндекс'],['youdo','YouDo'],['avito','Авито'],['hh','hh.ru'],['other','Другое']];
+const T1 = 'Здравствуйте!\n\nУвидел вашу компанию «{название}» ({адрес}) на Яндекс.Картах{оценка}.\n\nОбратил внимание, что отдельного сайта пока нет. Перед Новым годом многие заказывают календари, и часть клиентов выбирает тех, у кого сразу видны виды календарей, тиражи и цены.\n\nЯ делаю сайты для типографий. Есть готовый пример страницы квартальных календарей с таблицей цен по тиражам — могу прислать ссылку, если интересно. За 1–2 дня соберу такой же под вас, сначала покажу бесплатно.\n\nВот скриншот примера сайта!';
+const T2 = 'Спасибо! Вот пример: {ссылка}\nТам виды календарей (ламинация, пружина, блоки), таблица цен по тиражам и контакты, с телефона всё удобно. За 1–2 дня соберу такой же под вас: ваше название, цены, адрес. Сначала покажу — понравится, обсудим, нет — ничего не должны.';
+
+let S = fresh();
+let tab = 'orders';       // orders | contacts | more
+let fOrder = 'all', fCont = 'all', q = '';
+let sheet = null;         // { html, bind }
+
+function fresh() {
+  return { v: 1, orders: [], contacts: [], cur: 'l1',
+    lists: [{ id: 'l1', name: 'Типографии: календари', url: 'https://web-atelie.ru/kalendari/', t1: T1, t2: T2 }] };
+}
+const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4);
+const today = () => new Date().toISOString().slice(0, 10);
+const addDays = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
+const fmtDate = (s) => s ? s.slice(8, 10) + '.' + s.slice(5, 7) : '';
+const money = (n) => (Math.round(+n || 0)).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' ₽';
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const lbl = (arr, k) => (arr.find((x) => x[0] === k) || [k, k])[1];
+const curList = () => S.lists.find((l) => l.id === S.cur) || S.lists[0];
+
+// ───────── хранение: облако Telegram, запасной вариант — память устройства ─────────
+const CS = TG && TG.CloudStorage && TG.isVersionAtLeast && TG.isVersionAtLeast('6.9') ? TG.CloudStorage : null;
+const LS_KEY = 'myminiapp-data';
+const csGet = (keys) => new Promise((r) => CS.getItems(keys, (e, v) => r(e ? {} : v || {})));
+const csSet = (k, v) => new Promise((r) => CS.setItem(k, v, (e, ok) => r(!e && ok)));
+const csDel = (keys) => new Promise((r) => CS.removeItems(keys, () => r()));
+
+async function loadData() {
+  if (DEMO) return null;
+  let raw = null;
+  if (CS) {
+    const n = +((await csGet(['n'])).n || 0);
+    if (n > 0) {
+      const keys = Array.from({ length: n }, (_, i) => 'c' + i);
+      const got = await csGet(keys);
+      raw = keys.map((k) => got[k] || '').join('');
+    }
+  }
+  if (!raw) { try { raw = localStorage.getItem(LS_KEY); } catch (e) {} }
+  if (!raw) return null;
+  try { const d = JSON.parse(raw); return d && d.v === 1 ? d : null; } catch (e) { return null; }
+}
+
+function chunk(str) {
+  const out = []; let cur = '', bytes = 0;
+  for (const ch of str) {
+    const c = ch.codePointAt(0), b = c < 128 ? 1 : c < 2048 ? 2 : c < 65536 ? 3 : 4;
+    if (bytes + b > 3400) { out.push(cur); cur = ''; bytes = 0; }
+    cur += ch; bytes += b;
+  }
+  if (cur) out.push(cur);
+  return out;
+}
+let saveTimer = null, prevN = 0;
+function save() {
+  if (DEMO) return;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(async () => {
+    const json = JSON.stringify(S);
+    try { localStorage.setItem(LS_KEY, json); } catch (e) {}
+    if (CS) {
+      const parts = chunk(json);
+      let ok = true;
+      for (let i = 0; i < parts.length; i++) ok = (await csSet('c' + i, parts[i])) && ok;
+      if (ok) {
+        await csSet('n', String(parts.length));
+        if (prevN > parts.length) await csDel(Array.from({ length: prevN - parts.length }, (_, i) => 'c' + (parts.length + i)));
+        prevN = parts.length;
+      }
+    }
+    const el = document.getElementById('saved');
+    el.classList.add('on'); setTimeout(() => el.classList.remove('on'), 900);
+  }, 350);
+}
+
+// ───────── вспомогательное ─────────
+function safeUrl(u) {
+  try { const x = new URL(String(u).trim()); return /^https?:$/.test(x.protocol) ? x.href : ''; } catch (e) { return ''; }
+}
+function openUrl(u) {
+  const s = safeUrl(u); if (!s) return;
+  if (TG && TG.openLink) TG.openLink(s); else window.open(s, '_blank', 'noopener');
+}
+function detectSrc(u) {
+  const s = String(u).toLowerCase();
+  if (s.includes('kwork')) return 'kwork';
+  if (s.includes('youdo')) return 'youdo';
+  if (s.includes('avito')) return 'avito';
+  if (s.includes('hh.ru')) return 'hh';
+  if (s.includes('yandex') || s.includes('ya.ru')) return 'yandex';
+  return 'other';
+}
+function guessTitle(u, src) {
+  let m = String(u).match(/projects\/(\d+)/) || String(u).match(/youdo\.com\/t(\d+)/) || String(u).match(/vacancy\/(\d+)/) || String(u).match(/_(\d{6,})/);
+  return m ? lbl(SRC, src) + ' №' + m[1] : '';
+}
+function normPhone(p) {
+  let d = String(p || '').replace(/\D/g, '');
+  if (d.length === 11 && d[0] === '8') d = '7' + d.slice(1);
+  if (d.length === 10) d = '7' + d;
+  return d;
+}
+function waNumber(c) {
+  const d = normPhone(c.wa || c.phone);
+  return d.length >= 11 ? d : '';
+}
+function plural(n, a, b, c) { n = Math.abs(n) % 100; const k = n % 10; return n > 10 && n < 20 ? c : k === 1 ? a : k > 1 && k < 5 ? b : c; }
+function fillText(t, c, list) {
+  let rate = '';
+  const r = +c.rating, n = +c.reviews;
+  if (r >= 4 && n >= 5) rate = ': рейтинг ' + String(r.toFixed(1)).replace('.', ',') + ' и ' + n + ' ' + plural(n, 'отзыв', 'отзыва', 'отзывов');
+  return t.replace(/\{название\}/g, c.name || '').replace(/\{адрес\}/g, c.addr || '')
+          .replace(/\{оценка\}/g, rate).replace(/\{ссылка\}/g, list.url || '');
+}
+function waLink(c, which) {
+  const list = S.lists.find((l) => l.id === c.list) || curList();
+  const num = waNumber(c); if (!num) return '';
+  return 'https://wa.me/' + num + '?text=' + encodeURIComponent(fillText(which === 2 ? list.t2 : list.t1, c, list));
+}
+function confirmAsk(text, cb) {
+  if (TG && TG.showConfirm) TG.showConfirm(text, (ok) => ok && cb());
+  else if (confirm(text)) cb();
+}
+
+// ───────── отрисовка ─────────
+const $app = document.getElementById('app');
+function render() {
+  const titles = { orders: ['Заказы', 'Kwork, Яндекс, YouDo, Авито, hh.ru'], contacts: ['Рассылка', curList().name], more: ['Ещё', 'Списки, тексты, копия данных'] };
+  const t = titles[tab];
+  $app.innerHTML =
+    '<div class="top"><h1>' + esc(t[0]) + '</h1><div class="sub">' + esc(t[1]) + '</div></div>' +
+    '<div class="body" id="body">' + (tab === 'orders' ? viewOrders() : tab === 'contacts' ? viewContacts() : viewMore()) + '</div>' +
+    (tab !== 'more' ? '<button class="fab" data-act="' + (tab === 'orders' ? 'order-new' : 'cont-new') + '" aria-label="Добавить">+</button>' : '') +
+    '<nav class="tabs">' +
+    [['orders', '📋', 'Заказы'], ['contacts', '✉️', 'Рассылка'], ['more', '⚙️', 'Ещё']]
+      .map((x) => '<button data-act="tab" data-v="' + x[0] + '" class="' + (tab === x[0] ? 'on' : '') + '"><b>' + x[1] + '</b>' + x[2] + '</button>').join('') +
+    '</nav>' + (sheet ? '<div class="sheet-bg" data-act="sheet-bg"><div class="sheet" id="sheet">' + sheet.html + '</div></div>' : '');
+  if (sheet && sheet.bind) sheet.bind(document.getElementById('sheet'));
+}
+
+function viewOrders() {
+  const all = S.orders;
+  const month = today().slice(0, 7);
+  const inWork = all.filter((o) => o.status === 'work').length;
+  const wait = all.filter((o) => o.status === 'done').reduce((s, o) => s + (+o.price || 0), 0);
+  const paid = all.filter((o) => o.status === 'paid' && (o.paidAt || '').slice(0, 7) === month).reduce((s, o) => s + (+o.price || 0), 0);
+  let list = all.filter((o) => (fOrder === 'all' || o.status === fOrder) && (!q || (o.title + ' ' + o.note).toLowerCase().includes(q.toLowerCase())));
+  list = list.slice().sort((a, b) => (b.created || '').localeCompare(a.created || ''));
+  let h = '<div class="stats">' +
+    '<div class="stat"><b>' + inWork + '</b><span>в работе</span></div>' +
+    '<div class="stat"><b>' + money(wait) + '</b><span>ждут оплаты</span></div>' +
+    '<div class="stat"><b>' + money(paid) + '</b><span>оплачено за месяц</span></div></div>';
+  h += '<input class="search" data-act="q" placeholder="Поиск по названию и заметке" value="' + esc(q) + '">';
+  h += '<div class="chips">' + [['all', 'Все']].concat(ORDER_ST).map((x) =>
+    '<button class="chip ' + (fOrder === x[0] ? 'on' : '') + '" data-act="forder" data-v="' + x[0] + '">' + x[1] + '</button>').join('') + '</div>';
+  if (!list.length) return h + '<div class="empty"><b>' + (all.length ? 'Ничего не найдено' : 'Пока заказов нет') + '</b>' +
+    (all.length ? 'Измените фильтр или поиск.' : 'Нажмите «+», вставьте ссылку на заказ, и он появится здесь.') + '</div>';
+  return h + list.map((o) =>
+    '<div class="card" data-act="order-edit" data-id="' + o.id + '"><div class="row"><div><h3>' + esc(o.title || 'Без названия') + '</h3>' +
+    '<div class="meta"><span class="badge">' + esc(lbl(SRC, o.src)) + '</span>' + (o.deadline ? 'срок ' + fmtDate(o.deadline) : '') + '</div></div>' +
+    '<div class="price">' + (o.price ? money(o.price) : '') + '</div></div>' +
+    '<div style="margin-top:8px"><span class="st ' + o.status + '">' + esc(lbl(ORDER_ST, o.status)) + '</span></div>' +
+    (o.note ? '<div class="meta">' + esc(o.note) + '</div>' : '') + '</div>').join('');
+}
+
+function viewContacts() {
+  const L = curList();
+  const all = S.contacts.filter((c) => c.list === L.id);
+  const cnt = (k) => all.filter((c) => c.status === k).length;
+  const due = (c) => c.status === 'later' && c.followAt && c.followAt <= today();
+  let list = all.filter((c) => (fCont === 'all' || c.status === fCont) &&
+    (!q || (c.name + ' ' + c.addr + ' ' + c.phone).toLowerCase().includes(q.toLowerCase())));
+  let h = '<div class="stats">' +
+    '<div class="stat"><b>' + all.length + '</b><span>всего</span></div>' +
+    '<div class="stat"><b>' + cnt('none') + '</b><span>не писал</span></div>' +
+    '<div class="stat"><b>' + cnt('yes') + '</b><span>ответили «да»</span></div></div>';
+  if (S.lists.length > 1) h += '<label class="f"><span>Список</span><select data-act="list-switch">' +
+    S.lists.map((l) => '<option value="' + l.id + '"' + (l.id === L.id ? ' selected' : '') + '>' + esc(l.name) + '</option>').join('') + '</select></label>';
+  h += '<input class="search" data-act="q" placeholder="Поиск по названию, адресу, телефону" value="' + esc(q) + '">';
+  h += '<div class="chips">' + [['all', 'Все']].concat(CONT_ST).map((x) =>
+    '<button class="chip ' + (fCont === x[0] ? 'on' : '') + '" data-act="fcont" data-v="' + x[0] + '">' + x[1] + '</button>').join('') + '</div>';
+  if (!list.length) return h + '<div class="empty"><b>' + (all.length ? 'Ничего не найдено' : 'В списке пока пусто') + '</b>' +
+    (all.length ? 'Измените фильтр или поиск.' : 'Нажмите «+» и добавьте компанию, либо откройте «Ещё» → «Импорт списка» и вставьте таблицу.') + '</div>';
+  return h + list.map((c) => {
+    const num = waNumber(c);
+    return '<div class="card"><div data-act="cont-edit" data-id="' + c.id + '"><div class="row"><div><h3>' + esc(c.name) + '</h3>' +
+      '<div class="meta">' + esc(c.addr || '') + '</div><div class="meta">' + esc(c.phone || '') +
+      (c.rating ? ' · ★ ' + esc(String(c.rating).replace('.', ',')) + (c.reviews ? ' (' + esc(c.reviews) + ')' : '') : '') + '</div></div></div>' +
+      '<div style="margin-top:8px"><span class="st ' + c.status + '">' + esc(lbl(CONT_ST, c.status)) + '</span>' +
+      (c.wroteAt ? ' <span class="meta">написал ' + fmtDate(c.wroteAt) + '</span>' : '') +
+      (c.status === 'later' && c.followAt ? ' <span class="meta" style="' + (due(c) ? 'color:var(--bad);font-weight:600' : '') + '">повторить с ' + fmtDate(c.followAt) + '</span>' : '') + '</div>' +
+      (c.note ? '<div class="meta">' + esc(c.note) + '</div>' : '') + '</div>' +
+      '<div class="acts">' +
+      '<button class="btn" data-act="wa1" data-id="' + c.id + '"' + (num ? '' : ' disabled') + '>Написать</button>' +
+      '<button class="btn ' + (c.status === 'yes' ? '' : 'sec') + '" data-act="wa2" data-id="' + c.id + '"' + (num ? '' : ' disabled') + '>Отправить ссылку</button>' +
+      (c.phone ? '<a class="btn sec" href="tel:' + esc(String(c.phone).replace(/[^\d+]/g, '')) + '">Позвонить</a>' : '') +
+      '</div></div>';
+  }).join('');
+}
+
+function viewMore() {
+  const where = CS ? 'в облаке Telegram (синхронизируется между вашими устройствами)' : 'в памяти этого устройства (вне Telegram)';
+  return '<div class="sec-t">Списки рассылки</div>' +
+    S.lists.map((l) => '<div class="card"><div class="row"><div><h3>' + esc(l.name) + '</h3><div class="meta">' +
+      S.contacts.filter((c) => c.list === l.id).length + ' компаний · ' + esc(l.url || 'без ссылки') + '</div></div>' +
+      '<button class="btn sec" data-act="list-edit" data-id="' + l.id + '">Тексты</button></div></div>').join('') +
+    '<div class="acts" style="margin:0 0 6px"><button class="btn sec" data-act="list-new">+ Новый список</button>' +
+    '<button class="btn" data-act="import">Импорт списка</button></div>' +
+    '<div class="sec-t">Данные</div>' +
+    '<div class="card"><div class="meta" style="margin:0 0 8px">Хранятся ' + where + '.</div>' +
+    '<div class="acts" style="margin-top:0"><button class="btn sec" data-act="export">Скопировать копию</button>' +
+    '<button class="btn sec" data-act="restore">Вставить копию</button>' +
+    '<button class="btn red" data-act="wipe">Стереть всё</button></div></div>' +
+    '<div class="note">Токен бота и пароли в приложении не хранятся. Копию данных держите у себя: в ней телефоны компаний.</div>';
+}
+
+// ───────── окна ─────────
+function openSheet(html, bind) { sheet = { html, bind }; render(); if (TG && TG.BackButton) { TG.BackButton.show(); } }
+function closeSheet() { sheet = null; render(); if (TG && TG.BackButton) TG.BackButton.hide(); }
+const opts = (arr, cur) => arr.map((x) => '<option value="' + x[0] + '"' + (x[0] === cur ? ' selected' : '') + '>' + esc(x[1]) + '</option>').join('');
+
+function orderSheet(id) {
+  const o = id ? S.orders.find((x) => x.id === id) : { title: '', src: 'kwork', url: '', price: '', deadline: '', status: 'new', note: '' };
+  openSheet('<h2>' + (id ? 'Заказ' : 'Новый заказ') + '</h2>' +
+    '<label class="f"><span>Ссылка на заказ</span><input id="o-url" inputmode="url" value="' + esc(o.url) + '" placeholder="https://kwork.ru/projects/…"></label>' +
+    '<label class="f"><span>Название</span><input id="o-title" value="' + esc(o.title) + '"></label>' +
+    '<div class="g2"><label class="f"><span>Источник</span><select id="o-src">' + opts(SRC, o.src) + '</select></label>' +
+    '<label class="f"><span>Сумма, ₽</span><input id="o-price" type="number" inputmode="numeric" value="' + esc(o.price) + '"></label></div>' +
+    '<div class="g2"><label class="f"><span>Статус</span><select id="o-st">' + opts(ORDER_ST, o.status) + '</select></label>' +
+    '<label class="f"><span>Срок сдачи</span><input id="o-dl" type="date" value="' + esc(o.deadline) + '"></label></div>' +
+    '<label class="f"><span>Заметка</span><textarea id="o-note">' + esc(o.note) + '</textarea></label>' +
+    '<div class="acts"><button class="btn" data-act="order-save" data-id="' + (id || '') + '">Сохранить</button>' +
+    (o.url ? '<button class="btn sec" data-act="open-url" data-url="' + esc(o.url) + '">Открыть заказ</button>' : '') +
+    (id ? '<button class="btn red" data-act="order-del" data-id="' + id + '">Удалить</button>' : '') +
+    '<button class="btn sec" data-act="sheet-close">Закрыть</button></div>',
+    (root) => {
+      const u = root.querySelector('#o-url');
+      u.addEventListener('input', () => {
+        const s = detectSrc(u.value); root.querySelector('#o-src').value = s;
+        const t = root.querySelector('#o-title'); if (!t.value) t.value = guessTitle(u.value, s);
+      });
+    });
+}
+function contactSheet(id) {
+  const c = id ? S.contacts.find((x) => x.id === id) : { name: '', addr: '', phone: '', wa: '', rating: '', reviews: '', status: 'none', note: '' };
+  openSheet('<h2>' + (id ? 'Компания' : 'Новая компания') + '</h2>' +
+    '<label class="f"><span>Название</span><input id="c-name" value="' + esc(c.name) + '"></label>' +
+    '<label class="f"><span>Адрес</span><input id="c-addr" value="' + esc(c.addr) + '"></label>' +
+    '<div class="g2"><label class="f"><span>Телефон</span><input id="c-phone" inputmode="tel" value="' + esc(c.phone) + '"></label>' +
+    '<label class="f"><span>WhatsApp (если другой номер)</span><input id="c-wa" inputmode="tel" value="' + esc(c.wa) + '"></label></div>' +
+    '<div class="g2"><label class="f"><span>Рейтинг</span><input id="c-rate" inputmode="decimal" value="' + esc(c.rating) + '"></label>' +
+    '<label class="f"><span>Отзывов</span><input id="c-rev" inputmode="numeric" value="' + esc(c.reviews) + '"></label></div>' +
+    '<label class="f"><span>Статус</span><select id="c-st">' + opts(CONT_ST, c.status) + '</select></label>' +
+    '<label class="f"><span>Заметка</span><textarea id="c-note">' + esc(c.note) + '</textarea></label>' +
+    '<div class="acts"><button class="btn" data-act="cont-save" data-id="' + (id || '') + '">Сохранить</button>' +
+    (id ? '<button class="btn red" data-act="cont-del" data-id="' + id + '">Удалить</button>' : '') +
+    '<button class="btn sec" data-act="sheet-close">Закрыть</button></div>');
+}
+function listSheet(id) {
+  const l = id ? S.lists.find((x) => x.id === id) : { name: '', url: '', t1: curList().t1, t2: curList().t2 };
+  openSheet('<h2>' + (id ? 'Список и тексты' : 'Новый список') + '</h2>' +
+    '<label class="f"><span>Название списка</span><input id="l-name" value="' + esc(l.name) + '"></label>' +
+    '<label class="f"><span>Ссылка на пример сайта (подставится в {ссылка})</span><input id="l-url" inputmode="url" value="' + esc(l.url) + '"></label>' +
+    '<label class="f"><span>1-е сообщение (без ссылки)</span><textarea id="l-t1" style="min-height:190px">' + esc(l.t1) + '</textarea></label>' +
+    '<label class="f"><span>2-е сообщение (после «да», со ссылкой)</span><textarea id="l-t2" style="min-height:130px">' + esc(l.t2) + '</textarea></label>' +
+    '<div class="note">Подстановки: {название}, {адрес}, {оценка} (появляется только при рейтинге от 4,0 и 5+ отзывах), {ссылка}.</div>' +
+    '<div class="acts"><button class="btn" data-act="list-save" data-id="' + (id || '') + '">Сохранить</button>' +
+    (id && S.lists.length > 1 ? '<button class="btn red" data-act="list-del" data-id="' + id + '">Удалить список</button>' : '') +
+    '<button class="btn sec" data-act="sheet-close">Закрыть</button></div>');
+}
+function importSheet() {
+  openSheet('<h2>Импорт списка</h2>' +
+    '<div class="note">Вставьте строки из таблицы: <b>название; адрес; телефон; рейтинг; отзывов; WhatsApp</b> (последние три можно пропустить). Разделитель — табуляция или «;». Компании попадут в текущий список: <b>' + esc(curList().name) + '</b>.</div>' +
+    '<label class="f"><textarea id="imp" style="min-height:200px" placeholder="Типография Пример;ул. Лесная, 5;+7 (900) 000-00-00;4,9;120"></textarea></label>' +
+    '<div class="acts"><button class="btn" data-act="import-go">Добавить</button><button class="btn sec" data-act="sheet-close">Закрыть</button></div>');
+}
+function textSheet(title, note, value, actLabel, act) {
+  openSheet('<h2>' + esc(title) + '</h2><div class="note">' + esc(note) + '</div>' +
+    '<label class="f"><textarea id="tx" style="min-height:200px">' + esc(value) + '</textarea></label>' +
+    '<div class="acts">' + (act ? '<button class="btn" data-act="' + act + '">' + esc(actLabel) + '</button>' : '') +
+    '<button class="btn sec" data-act="sheet-close">Закрыть</button></div>');
+}
+
+// ───────── действия ─────────
+const val = (id) => (document.getElementById(id) || {}).value || '';
+document.addEventListener('click', (e) => {
+  const el = e.target.closest('[data-act]'); if (!el) return;
+  const act = el.dataset.act, id = el.dataset.id;
+  if (act === 'sheet-bg') { if (e.target === el) closeSheet(); return; }
+  if (act === 'q' || act === 'list-switch') return;
+  e.stopPropagation();
+  switch (act) {
+    case 'tab': tab = el.dataset.v; q = ''; render(); break;
+    case 'forder': fOrder = el.dataset.v; render(); break;
+    case 'fcont': fCont = el.dataset.v; render(); break;
+    case 'order-new': orderSheet(null); break;
+    case 'order-edit': orderSheet(id); break;
+    case 'order-save': {
+      const url = val('o-url').trim(); const src = val('o-src'); const status = val('o-st');
+      const rec = { title: val('o-title').trim() || guessTitle(url, src) || 'Без названия', src, url, price: val('o-price'),
+        deadline: val('o-dl'), status, note: val('o-note').trim() };
+      if (id) {
+        const o = S.orders.find((x) => x.id === id);
+        if (status === 'paid' && o.status !== 'paid') rec.paidAt = today();
+        Object.assign(o, rec);
+      } else { rec.id = uid(); rec.created = today(); if (status === 'paid') rec.paidAt = today(); S.orders.push(rec); }
+      save(); closeSheet(); break;
+    }
+    case 'order-del': confirmAsk('Удалить заказ?', () => { S.orders = S.orders.filter((x) => x.id !== id); save(); closeSheet(); }); break;
+    case 'open-url': openUrl(el.dataset.url); break;
+    case 'cont-new': contactSheet(null); break;
+    case 'cont-edit': contactSheet(id); break;
+    case 'cont-save': {
+      const rec = { name: val('c-name').trim(), addr: val('c-addr').trim(), phone: val('c-phone').trim(), wa: val('c-wa').trim(),
+        rating: val('c-rate').replace(',', '.').trim(), reviews: val('c-rev').trim(), status: val('c-st'), note: val('c-note').trim() };
+      if (!rec.name) { if (TG && TG.showAlert) TG.showAlert('Укажите название'); else alert('Укажите название'); break; }
+      const apply = (c) => { if (rec.status === 'later' && c.status !== 'later') rec.followAt = addDays(30);
+        if (rec.status === 'wrote' && !c.wroteAt) rec.wroteAt = today(); Object.assign(c, rec); };
+      if (id) apply(S.contacts.find((x) => x.id === id));
+      else { const c = { id: uid(), list: curList().id }; apply(c); S.contacts.push(c); }
+      save(); closeSheet(); break;
+    }
+    case 'cont-del': confirmAsk('Удалить компанию из списка?', () => { S.contacts = S.contacts.filter((x) => x.id !== id); save(); closeSheet(); }); break;
+    case 'wa1': case 'wa2': {
+      const c = S.contacts.find((x) => x.id === id); if (!c) break;
+      const url = waLink(c, act === 'wa2' ? 2 : 1);
+      if (act === 'wa1' && (c.status === 'none')) { c.status = 'wrote'; c.wroteAt = today(); save(); }
+      render(); openUrl(url); break;
+    }
+    case 'list-new': listSheet(null); break;
+    case 'list-edit': listSheet(id); break;
+    case 'list-save': {
+      const rec = { name: val('l-name').trim() || 'Список', url: val('l-url').trim(), t1: val('l-t1'), t2: val('l-t2') };
+      if (id) Object.assign(S.lists.find((x) => x.id === id), rec);
+      else { rec.id = uid(); S.lists.push(rec); S.cur = rec.id; }
+      save(); closeSheet(); break;
+    }
+    case 'list-del': confirmAsk('Удалить список и все его компании?', () => {
+      S.contacts = S.contacts.filter((c) => c.list !== id); S.lists = S.lists.filter((l) => l.id !== id);
+      if (S.cur === id) S.cur = S.lists[0].id; save(); closeSheet(); }); break;
+    case 'import': importSheet(); break;
+    case 'import-go': {
+      const lines = val('imp').split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+      let added = 0, skipped = 0; const L = curList();
+      for (const ln of lines) {
+        const p = ln.split(/\t|;/).map((s) => s.trim());
+        if (!p[0] || /^название$/i.test(p[0])) continue;
+        const rec = { id: uid(), list: L.id, name: p[0], addr: p[1] || '', phone: p[2] || '', rating: (p[3] || '').replace(',', '.'),
+          reviews: p[4] || '', wa: p[5] || '', status: 'none', note: '' };
+        const dup = S.contacts.some((c) => c.list === L.id && c.name.toLowerCase() === rec.name.toLowerCase() && normPhone(c.phone) === normPhone(rec.phone));
+        if (dup) skipped++; else { S.contacts.push(rec); added++; }
+      }
+      save(); sheet = null; tab = 'contacts'; render();
+      const msg = 'Добавлено: ' + added + (skipped ? ', пропущено повторов: ' + skipped : '');
+      if (TG && TG.showAlert) TG.showAlert(msg); else alert(msg); break;
+    }
+    case 'export': {
+      const json = JSON.stringify(S);
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(json).then(
+        () => (TG && TG.showAlert ? TG.showAlert('Копия в буфере обмена. Вставьте её в заметки.') : alert('Копия в буфере обмена')),
+        () => textSheet('Копия данных', 'Выделите всё и скопируйте.', json, '', ''));
+      else textSheet('Копия данных', 'Выделите всё и скопируйте.', json, '', '');
+      break;
+    }
+    case 'restore': textSheet('Вставить копию', 'Вставьте текст копии. Текущие данные будут заменены.', '', 'Восстановить', 'restore-go'); break;
+    case 'restore-go': {
+      let d = null; try { d = JSON.parse(val('tx')); } catch (x) {}
+      if (!d || d.v !== 1 || !Array.isArray(d.orders) || !Array.isArray(d.contacts) || !Array.isArray(d.lists) || !d.lists.length) {
+        if (TG && TG.showAlert) TG.showAlert('Это не похоже на копию MyMiniApp'); else alert('Это не похоже на копию MyMiniApp'); break; }
+      confirmAsk('Заменить текущие данные копией?', () => { S = d; if (!S.lists.find((l) => l.id === S.cur)) S.cur = S.lists[0].id; save(); closeSheet(); });
+      break;
+    }
+    case 'wipe': confirmAsk('Стереть все заказы, компании и тексты?', () => { S = fresh(); save(); render(); }); break;
+    case 'sheet-close': closeSheet(); break;
+  }
+});
+document.addEventListener('input', (e) => {
+  const el = e.target;
+  if (el.dataset && el.dataset.act === 'q') {
+    q = el.value; const pos = el.selectionStart; render();
+    const n = document.querySelector('[data-act="q"]'); if (n) { n.focus(); n.setSelectionRange(pos, pos); }
+  }
+});
+document.addEventListener('change', (e) => {
+  const el = e.target;
+  if (el.dataset && el.dataset.act === 'list-switch') { S.cur = el.value; fCont = 'all'; save(); render(); }
+});
+
+// ───────── демо-данные для проверки (?demo=1, ничего не сохраняется) ─────────
+function demo() {
+  const l = S.lists[0];
+  S.orders = [
+    { id: 'd1', title: 'Kwork №3265111 · лендинг квартальных календарей', src: 'kwork', url: 'https://kwork.ru/projects/3265111', price: 12000, deadline: addDays(3), status: 'work', note: 'Макет от заказчика, без фото', created: addDays(-2) },
+    { id: 'd2', title: 'База знаний для сети фотостудий', src: 'kwork', url: '', price: 40000, deadline: '', status: 'sent', note: 'Тестовое 3 000 ₽ за 1 день', created: addDays(-1) },
+    { id: 'd3', title: 'Лого для кофейни', src: 'yandex', url: '', price: 4500, deadline: addDays(-4), status: 'done', note: '', created: addDays(-9) },
+    { id: 'd4', title: 'Сайт-визитка для мастера', src: 'avito', url: '', price: 15000, deadline: '', status: 'paid', note: '', created: addDays(-12), paidAt: today() },
+    { id: 'd5', title: 'Дизайн сайта (Figma)', src: 'youdo', url: 'https://youdo.com/t15296064', price: 20000, deadline: '', status: 'new', note: 'Редизайн аукциона, не наш формат', created: today() }
+  ];
+  const mk = (n, a, p, r, rv, st, extra) => Object.assign({ id: uid(), list: l.id, name: n, addr: a, phone: p, rating: r, reviews: rv, wa: '', status: st, note: '' }, extra || {});
+  S.contacts = [
+    mk('Типография «Пример»', 'Ленинградское ш., 9', '+7 (900) 111-22-33', '5.0', '525', 'none'),
+    mk('Копицентр «Образец»', 'Рязанский просп., 99А', '+7 (900) 222-33-44', '4.9', '113', 'wrote', { wroteAt: addDays(-1) }),
+    mk('Печать 24', 'ул. Правды, 24', '+7 (900) 333-44-55', '5.0', '69', 'yes', { wroteAt: addDays(-2) }),
+    mk('Принт Центр', 'Щёлковский пр., 9А', '+7 (900) 444-55-66', '4.8', '67', 'later', { wroteAt: addDays(-31), followAt: addDays(-1) }),
+    mk('Типография «Тест»', 'Голубинская ул., 9', '+7 (495) 555-66-77', '3.3', '18', 'none')
+  ];
+  S.cur = l.id;
+}
+
+// ───────── запуск ─────────
+(async function init() {
+  if (TG) {
+    try { TG.ready(); TG.expand(); } catch (e) {}
+    if (TG.BackButton) TG.BackButton.onClick(() => closeSheet());
+  }
+  if (DEMO) { demo(); const m = location.search.match(/tab=(\w+)/); if (m) tab = m[1]; }
+  else { const d = await loadData(); if (d) { S = d; if (!S.lists.length) S = fresh(); } }
+  render();
+})();
+</script>
+</body>
+</html>
