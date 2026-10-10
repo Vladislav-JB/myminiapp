@@ -76,6 +76,12 @@ button,input,select,textarea{font:inherit;color:inherit}
 .inb .it{border-top:1px solid var(--line);padding:10px 0}
 .inb .it h4{margin:0;font-size:15px;word-break:break-word}
 .inb .sm{padding:6px 10px;font-size:13px}
+.lim{background:var(--bg);border-radius:12px;padding:10px 12px;margin-bottom:12px}
+.lim .t{display:flex;justify-content:space-between;font-size:14px}
+.lim .bar{height:8px;border-radius:99px;background:var(--sec);margin-top:8px;overflow:hidden}
+.lim .bar i{display:block;height:100%;background:var(--ok);border-radius:99px}
+.lim.warn .bar i{background:var(--warn)}
+.lim.full .bar i{background:var(--bad)}
 .tip{font-size:13px;color:var(--hint);background:var(--bg);border-radius:12px;padding:10px 12px;margin-bottom:12px}
 .saved{position:fixed;left:50%;top:10px;transform:translateX(-50%);background:rgba(0,0,0,.75);color:#fff;font-size:13px;padding:6px 12px;border-radius:999px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:20}
 .saved.on{opacity:1}
@@ -115,7 +121,7 @@ let sheet = null;         // { html, bind }
 function fresh() {
   return { v: 1, orders: [], contacts: [], cur: 'l1',
     lists: [{ id: 'l1', name: 'Типографии: календари', url: 'https://web-atelie.ru/kalendari/', t1: T1, t2: T2 }],
-    inbox: { url: '', seen: [] }, replies: defaultReplies() };
+    inbox: { url: '', seen: [] }, replies: defaultReplies(), dayLimit: 10 };
 }
 let INBOX = { items: [], state: 'off', err: '', at: 0 };
 const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4);
@@ -231,6 +237,17 @@ function confirmAsk(text, cb) {
   else if (confirm(text)) cb();
 }
 
+// ───────── счётчик «написано сегодня» ─────────
+const todayCount = () => S.contacts.filter((c) => c.wroteAt === today()).length;
+const dayLimit = () => (S.dayLimit > 0 ? S.dayLimit : 10);
+function viewLimit() {
+  const n = todayCount(), L = dayLimit();
+  const cls = n >= L ? 'full' : n >= Math.ceil(L * 0.8) ? 'warn' : '';
+  return '<div class="lim ' + cls + '"><div class="t"><span>Написано сегодня</span><b>' + n + ' из ' + L + '</b></div>' +
+    '<div class="bar"><i style="width:' + Math.min(100, Math.round(n / L * 100)) + '%"></i></div>' +
+    (n >= L ? '<div class="meta" style="margin-top:6px">Лимит на сегодня исчерпан. Лучше продолжить завтра.</div>' : '') + '</div>';
+}
+
 // ───────── входящие: заказы от сторожей через секретный gist ─────────
 function gistId(u) { const m = String(u || '').match(/[0-9a-f]{20,40}/i); return m ? m[0] : ''; }
 function cleanItem(i) {
@@ -266,6 +283,7 @@ function newInbox() {
 function markSeen(keys) {
   S.inbox = S.inbox || { url: '', seen: [] };
   if (!Array.isArray(S.replies) || !S.replies.length) S.replies = defaultReplies();
+  if (!(S.dayLimit > 0)) S.dayLimit = 10;
   const set = new Set(S.inbox.seen);
   keys.forEach((k) => set.add(k));
   S.inbox.seen = Array.from(set).slice(-600);
@@ -342,7 +360,7 @@ function viewContacts() {
   const due = (c) => c.status === 'later' && c.followAt && c.followAt <= today();
   let list = all.filter((c) => (fCont === 'all' || c.status === fCont) &&
     (!q || (c.name + ' ' + c.addr + ' ' + c.phone).toLowerCase().includes(q.toLowerCase())));
-  let h = '<div class="stats">' +
+  let h = viewLimit() + '<div class="stats">' +
     '<div class="stat"><b>' + all.length + '</b><span>всего</span></div>' +
     '<div class="stat"><b>' + cnt('none') + '</b><span>не писал</span></div>' +
     '<div class="stat"><b>' + cnt('yes') + '</b><span>ответили «да»</span></div></div>';
@@ -376,6 +394,9 @@ function viewMore() {
   return '<div class="sec-t">Входящие (заказы от сторожей)</div>' +
     '<div class="card"><div class="meta" style="margin:0 0 8px">' + (inbId ? 'Подключено. Новых сейчас: ' + newInbox().length + '.' : 'Не подключено.') + '</div>' +
     '<div class="acts" style="margin-top:0"><button class="btn sec" data-act="inbox-setup">' + (inbId ? 'Изменить ссылку' : 'Подключить') + '</button></div></div>' +
+    '<div class="sec-t">Рассылка</div>' +
+    '<div class="card"><div class="row"><div><h3>Лимит в день</h3><div class="meta">Сколько новых первых сообщений в день. Сегодня: ' + todayCount() + ' из ' + dayLimit() + '.</div></div>' +
+    '<button class="btn sec" data-act="limit-edit">Изменить</button></div></div>' +
     '<div class="sec-t">Тексты откликов</div>' +
     S.replies.map((r) => '<div class="card"><div class="row"><div><h3>' + esc(r.name) + '</h3><div class="meta">' + esc(r.text.slice(0, 80)) + '…</div></div>' +
       '<button class="btn sec" data-act="rtpl-edit" data-id="' + r.id + '">Править</button></div></div>').join('') +
@@ -569,8 +590,14 @@ document.addEventListener('click', (e) => {
     case 'wa1': case 'wa2': {
       const c = S.contacts.find((x) => x.id === id); if (!c) break;
       const url = waLink(c, act === 'wa2' ? 2 : 1);
-      if (act === 'wa1' && (c.status === 'none')) { c.status = 'wrote'; c.wroteAt = today(); save(); }
-      render(); openUrl(url); break;
+      const go = () => {
+        if (act === 'wa1' && (c.status === 'none')) { c.status = 'wrote'; c.wroteAt = today(); save(); }
+        render(); openUrl(url);
+      };
+      if (act === 'wa1' && c.status === 'none' && todayCount() >= dayLimit())
+        confirmAsk('Сегодня уже написано ' + todayCount() + ' из ' + dayLimit() + '. Лимит нужен, чтобы не получить блокировку. Написать ещё одному?', go);
+      else go();
+      break;
     }
     case 'list-new': listSheet(null); break;
     case 'list-edit': listSheet(id); break;
@@ -602,6 +629,12 @@ document.addEventListener('click', (e) => {
     case 'inbox-refresh': INBOX.at = 0; fetchInbox(true); break;
     case 'inbox-hide': markSeen([el.dataset.k]); save(); render(); break;
     case 'inbox-hide-all': confirmAsk('Скрыть все новые (' + newInbox().length + ')?', () => { markSeen(newInbox().map((i) => i.key)); save(); render(); }); break;
+    case 'limit-edit':
+      openSheet('<h2>Лимит в день</h2><div class="note">Сколько новых первых сообщений вы пишете за день. При достижении приложение спросит подтверждение перед следующим. Считаются только первые сообщения (кнопка «Написать»), ответы со ссылкой не считаются.</div>' +
+        '<label class="f"><span>Сообщений в день</span><input id="lim-n" type="number" inputmode="numeric" min="1" max="200" value="' + dayLimit() + '"></label>' +
+        '<div class="acts"><button class="btn" data-act="limit-save">Сохранить</button><button class="btn sec" data-act="sheet-close">Закрыть</button></div>');
+      break;
+    case 'limit-save': { const n = Math.round(+val('lim-n')); S.dayLimit = n >= 1 && n <= 200 ? n : 10; save(); closeSheet(); break; }
     case 'reply-open': replySheet(id); break;
     case 'inbox-reply': { const o = takeInbox(el.dataset.k); if (o) { render(); replySheet(o.id); } break; }
     case 'reply-copy': { copyText(val('r-text')).then((ok) => notify(ok ? 'Текст скопирован' : 'Не удалось скопировать: выделите текст и скопируйте вручную')); break; }
@@ -661,7 +694,7 @@ document.addEventListener('click', (e) => {
       let d = null; try { d = JSON.parse(val('tx')); } catch (x) {}
       if (!d || d.v !== 1 || !Array.isArray(d.orders) || !Array.isArray(d.contacts) || !Array.isArray(d.lists) || !d.lists.length) {
         notify('Это не похоже на копию MyMiniApp'); break; }
-      confirmAsk('Заменить текущие данные копией?', () => { S = d; S.inbox = S.inbox || { url: '', seen: [] }; if (!Array.isArray(S.replies) || !S.replies.length) S.replies = defaultReplies(); if (!S.lists.find((l) => l.id === S.cur)) S.cur = S.lists[0].id; save(); closeSheet(); fetchInbox(true); });
+      confirmAsk('Заменить текущие данные копией?', () => { S = d; if (!(S.dayLimit > 0)) S.dayLimit = 10; S.inbox = S.inbox || { url: '', seen: [] }; if (!Array.isArray(S.replies) || !S.replies.length) S.replies = defaultReplies(); if (!S.lists.find((l) => l.id === S.cur)) S.cur = S.lists[0].id; save(); closeSheet(); fetchInbox(true); });
       break;
     }
     case 'wipe': confirmAsk('Стереть все заказы, компании и тексты?', () => { S = fresh(); save(); render(); }); break;
